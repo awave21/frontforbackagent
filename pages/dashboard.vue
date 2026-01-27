@@ -83,33 +83,6 @@
             </div>
           </div>
 
-          <!-- User Welcome Banner -->
-          <div v-else-if="user && tenant" class="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center">
-                <div class="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center mr-3">
-                  <span class="text-white font-bold text-sm">
-                    {{ user.full_name ? user.full_name.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase() }}
-                  </span>
-                </div>
-                <div>
-                  <h3 class="text-sm font-medium text-green-800">
-                    Добро пожаловать, {{ user.full_name || user.email }}!
-                  </h3>
-                  <p class="text-sm text-green-700">
-                    Организация: {{ tenant.name }} • Роль: {{ user.role }}
-                  </p>
-                </div>
-              </div>
-              <button
-                @click="handleLogout"
-                class="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
-              >
-                Выйти
-              </button>
-            </div>
-          </div>
-
           <!-- Header Section -->
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 lg:mb-8">
             <div class="mb-4 sm:mb-0">
@@ -218,7 +191,7 @@ import { useAuth } from '../composables/useAuth'
 const isSidebarOpen = ref(false)
 
 // Auth state
-const { isAuthenticated, user, tenant, logout } = useAuth()
+const { isAuthenticated, user, tenant } = useAuth()
 const showAuthModal = ref(false)
 
 // Auth handler
@@ -227,10 +200,6 @@ const handleAuthenticated = () => {
   // Можно обновить данные после аутентификации
 }
 
-// Logout handler
-const handleLogout = () => {
-  logout()
-}
 
 // Composables
 const { data: dashboardData } = await useDashboardData()

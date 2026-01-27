@@ -6,7 +6,7 @@
           Добро пожаловать в МедиАИ
         </h1>
         <p class="text-base sm:text-lg text-slate-600 mb-6 sm:mb-8">
-          Ваш медицинский чат-бот dashboard
+          Ваш медицинский чат-бот
         </p>
         <button
           @click="showAuthModal = true"
@@ -40,10 +40,12 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 
 // Auth state
 const { isAuthenticated } = useAuth()
+const router = useRouter()
 const showAuthModal = ref(false)
 
 // Show auth modal immediately if not authenticated
@@ -57,7 +59,7 @@ onMounted(() => {
 watch(isAuthenticated, (newAuth) => {
   if (newAuth) {
     // Redirect to dashboard after authentication
-    navigateTo('/dashboard')
+    router.push('/dashboard')
   } else {
     showAuthModal.value = true
   }
@@ -66,6 +68,6 @@ watch(isAuthenticated, (newAuth) => {
 // Handle authentication
 const handleAuthenticated = () => {
   showAuthModal.value = false
-  navigateTo('/dashboard')
+  router.push('/dashboard')
 }
 </script>

@@ -119,11 +119,6 @@
                   </div>
                 </div>
 
-                <!-- Ошибка -->
-                <div v-if="error" class="text-red-600 text-sm bg-red-50 p-3 rounded-lg">
-                  {{ error }}
-                </div>
-
                 <!-- Кнопки -->
                 <div class="flex gap-3 pt-4">
                   <button

@@ -234,16 +234,75 @@ x-api-key: your-api-key
 ```json
 {
   "id": "uuid",
+  "tenant_id": "uuid",
   "agent_id": "uuid",
   "session_id": "uuid",
-  "status": "succeeded",
-  "input_message": "Hello...",
-  "output_message": "The current weather in Moscow is sunny, 22°C",
   "trace_id": "uuid",
+  "status": "succeeded",
+  "input_message": "Hello, please use the weather tool to get current weather in Moscow",
+  "output_message": "The current weather in Moscow is sunny, 22°C",
+  "error_message": null,
+  "prompt_tokens": 150,
+  "completion_tokens": 45,
+  "total_tokens": 195,
+  "tools_called": [
+    {
+      "name": "get_weather",
+      "tool_call_id": "call_abc123",
+      "args": {
+        "city": "Moscow"
+      }
+    }
+  ],
+  "messages": null,
   "created_at": "2024-01-01T00:00:00Z",
   "updated_at": "2024-01-01T00:00:01Z"
 }
 ```
+
+**Схема данных ответа:**
+
+```typescript
+interface RunResponse {
+  // Идентификаторы
+  id: string;                    // UUID запуска
+  tenant_id: string;             // UUID арендатора
+  agent_id: string;              // UUID агента
+  session_id: string;            // UUID сессии (для контекста диалога)
+  trace_id: string;              // UUID для трейсинга запроса
+  
+  // Статус и сообщения
+  status: "succeeded" | "failed" | "running" | "queued";
+  input_message: string;         // Входное сообщение пользователя
+  output_message: string | null; // Ответ агента (null если статус не succeeded)
+  error_message: string | null;  // Сообщение об ошибке (null если нет ошибки)
+  
+  // Токены LLM
+  prompt_tokens: number | null;      // Количество токенов во входном промпте
+  completion_tokens: number | null;  // Количество токенов в ответе
+  total_tokens: number | null;       // Общее количество токенов
+  
+  // Инструменты
+  tools_called: Array<{
+    name: string;                // Название вызванного инструмента
+    tool_call_id: string | null; // ID вызова инструмента
+    args: Record<string, any>;   // Аргументы, переданные инструменту
+  }> | null;
+  
+  // Метаданные
+  messages: Array<any> | null;   // Полная история сообщений от pydantic-ai (опционально)
+  created_at: string;            // ISO 8601 timestamp создания
+  updated_at: string | null;     // ISO 8601 timestamp обновления
+}
+```
+
+**Примечания:**
+- `prompt_tokens` - включает системный промпт, историю сообщений и текущий запрос
+- `completion_tokens` - токены в ответе агента
+- `total_tokens` - сумма prompt_tokens + completion_tokens
+- Поля токенов могут быть `null`, если LLM провайдер не возвращает эту информацию
+- `tools_called` содержит список всех инструментов, вызванных агентом в этом запросе
+- `messages` содержит полную историю от pydantic-ai (может быть null для экономии трафика)
 
 #### `POST /runs/stream`
 
@@ -256,7 +315,7 @@ event: start
 data: {"run_id": "uuid", "trace_id": "uuid"}
 
 event: result
-data: {"output": "Agent response text"}
+data: {"output": "Agent response text", "tokens": {"prompt_tokens": 150, "completion_tokens": 45, "total_tokens": 195}}
 
 event: error
 data: {"error": "Error message"}
@@ -343,13 +402,22 @@ interface Run {
   tenant_id: UUID;
   agent_id: UUID;
   session_id: UUID;
-  status: "running" | "succeeded" | "failed";
-  input_message: string;
-  output_message?: string;
-  error_message?: string;
   trace_id: string;
+  status: "running" | "succeeded" | "failed" | "queued";
+  input_message: string;
+  output_message: string | null;
+  error_message: string | null;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  tools_called: Array<{
+    name: string;
+    tool_call_id: string | null;
+    args: Record<string, any>;
+  }> | null;
+  messages: Array<any> | null;
   created_at: DateTime;
-  updated_at?: DateTime;
+  updated_at: DateTime | null;
 }
 ```
 

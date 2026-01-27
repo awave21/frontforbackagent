@@ -98,107 +98,18 @@
                 <SlidersHorizontalIcon class="h-4 w-4" />
                 <span class="hidden sm:inline">Фильтры</span>
               </button>
-              <!-- Add New Agent Button -->
-              <button
-                v-if="isAuthenticated && !showCreateForm"
-                @click="showCreateForm = true"
-                class="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-600 hover:to-purple-700 transition-colors"
+              
+              <!-- Create New Agent Button (Header) -->
+              <NuxtLink
+                v-if="isAuthenticated"
+                to="/agents/new"
+                class="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-600 hover:to-purple-700 transition-colors shadow-sm shadow-indigo-100"
               >
                 <PlusIcon class="h-4 w-4" />
                 <span class="hidden sm:inline">Новый агент</span>
                 <span class="sm:hidden">Новый</span>
-              </button>
+              </NuxtLink>
             </div>
-          </div>
-
-          <!-- Create Agent Form -->
-          <div v-if="showCreateForm" class="bg-white rounded-xl border border-slate-200 p-6 mb-8">
-            <div class="flex items-center justify-between mb-6">
-              <h2 class="text-xl font-bold text-slate-900">Создать нового агента</h2>
-              <button
-                @click="showCreateForm = false"
-                class="p-2 text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <X class="h-5 w-5" />
-              </button>
-            </div>
-
-            <form @submit.prevent="handleCreateAgent" class="space-y-6">
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label class="block text-sm font-medium text-slate-700 mb-2">
-                    Название агента *
-                  </label>
-                  <input
-                    v-model="createForm.name"
-                    type="text"
-                    required
-                    class="w-full px-3 py-2 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="Например: Агент поддержки клиентов"
-                  />
-                </div>
-
-                <div>
-                  <label class="block text-sm font-medium text-slate-700 mb-2">
-                    Модель ИИ *
-                  </label>
-                  <select
-                    v-model="createForm.model"
-                    required
-                    class="w-full px-3 py-2 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  >
-                    <option value="">Выберите модель</option>
-                    <option value="openai:gpt-4o-mini">GPT-4o Mini</option>
-                    <option value="openai:gpt-4o">GPT-4o</option>
-                    <option value="openai:gpt-4">GPT-4</option>
-                    <option value="anthropic:claude-3-haiku">Claude 3 Haiku</option>
-                    <option value="anthropic:claude-3-sonnet">Claude 3 Sonnet</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label class="block text-sm font-medium text-slate-700 mb-2">
-                  Системный промпт *
-                </label>
-                <textarea
-                  v-model="createForm.system_prompt"
-                  required
-                  rows="4"
-                  class="w-full px-3 py-2 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
-                  placeholder="Опишите роль и поведение агента..."
-                />
-              </div>
-
-              <div class="flex gap-3">
-                <button
-                  type="button"
-                  @click="showCreateForm = false"
-                  class="flex-1 px-4 py-2 text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
-                >
-                  Отмена
-                </button>
-                <button
-                  type="submit"
-                  :disabled="creatingAgent"
-                  class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                >
-                  <Loader2 v-if="creatingAgent" class="h-4 w-4 animate-spin" />
-                  {{ creatingAgent ? 'Создание...' : 'Создать агента' }}
-                </button>
-              </div>
-            </form>
-          </div>
-
-          <!-- Add Agent Button -->
-          <div v-if="!showCreateForm && isAuthenticated" class="mb-8">
-            <button
-              @click="showCreateForm = true"
-              class="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-600 hover:to-purple-700 transition-colors"
-            >
-              <PlusIcon class="h-5 w-5" />
-              Создать нового агента
-            </button>
           </div>
 
           <!-- Stats Row -->
@@ -208,7 +119,9 @@
               <div class="flex items-center justify-between mb-3">
                 <p class="text-sm font-normal text-slate-600">Активные</p>
               </div>
-              <p class="text-3xl font-bold text-green-600">3</p>
+              <p class="text-3xl font-bold text-green-600">
+                {{ activeAgentsCount }}
+              </p>
             </div>
 
             <!-- Total Agents -->
@@ -216,17 +129,21 @@
               <div class="flex items-center justify-between mb-3">
                 <p class="text-sm font-normal text-slate-600">Всего агентов</p>
               </div>
-              <p class="text-3xl font-bold text-slate-900">3</p>
+              <p class="text-3xl font-bold text-slate-900">
+                {{ totalAgentsCount }}
+              </p>
             </div>
 
-            <!-- Today's Requests -->
+            <!-- Draft Agents -->
             <div class="bg-white rounded-xl border border-slate-200 p-5">
               <div class="flex items-center justify-between mb-3">
                 <p class="text-sm font-normal text-slate-600">
-                  Запросов сегодня
+                  Черновики
                 </p>
               </div>
-              <p class="text-3xl font-bold text-indigo-600">847</p>
+              <p class="text-3xl font-bold text-indigo-600">
+                {{ draftAgentsCount }}
+              </p>
             </div>
           </div>
 
@@ -235,21 +152,17 @@
             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
           </div>
 
-          <div v-else-if="agentsError" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p class="text-red-800">Ошибка загрузки агентов: {{ agentsError }}</p>
-          </div>
-
           <div v-else-if="agents.length === 0" class="text-center py-12">
             <Bot class="h-12 w-12 text-slate-400 mx-auto mb-4" />
             <h3 class="text-lg font-medium text-slate-900 mb-2">Нет агентов</h3>
             <p class="text-slate-600 mb-4">Создайте своего первого AI-агента</p>
-            <button
+            <NuxtLink
               v-if="isAuthenticated"
-                @click="showCreateForm = true"
+              to="/agents/new"
               class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
             >
               Создать агента
-            </button>
+            </NuxtLink>
           </div>
 
           <div v-else class="space-y-4">
@@ -286,7 +199,7 @@ definePageMeta({
   middleware: 'auth'
 })
 
-import { ref, onMounted, watch } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import {
   PlusIcon,
@@ -303,8 +216,8 @@ import {
   X,
   Loader2,
 } from "lucide-vue-next";
-import { useAgents, type Agent } from "../composables/useAgents";
-import { useAuth } from "../composables/useAuth";
+import { useAgents, type Agent } from "../../composables/useAgents";
+import { useAuth } from "../../composables/useAuth";
 
 // Mobile sidebar state
 const isSidebarOpen = ref(false);
@@ -315,20 +228,20 @@ const router = useRouter();
 // Auth state
 const { isAuthenticated } = useAuth();
 
-// Create agent form
-const createForm = ref({
-  name: '',
-  system_prompt: '',
-  model: '',
-});
-
 // Get agents data
-const { agents, fetchAgents, createAgent, isLoading: agentsLoading, error: agentsError } = useAgents();
+const { agents, fetchAgents, isLoading: agentsLoading, error: agentsError } = useAgents();
+
+// Computed stats from real data
+const totalAgentsCount = computed(() => agents.value.length);
+const activeAgentsCount = computed(() => 
+  agents.value.filter(agent => agent.status === 'published').length
+);
+const draftAgentsCount = computed(() => 
+  agents.value.filter(agent => agent.status === 'draft').length
+);
 
 // UI state
-const showCreateForm = ref(false);
 const showAuthModal = ref(false);
-const creatingAgent = ref(false);
 
 // Load agents on mount
 onMounted(async () => {
@@ -348,37 +261,6 @@ watch(isAuthenticated, async (newAuth) => {
   }
 });
 
-
-// Handle agent creation
-const handleCreateAgent = async () => {
-  try {
-    creatingAgent.value = true;
-    const newAgent = await createAgent({
-      ...createForm.value,
-      status: 'draft',
-      version: 1,
-      llm_params: {
-        temperature: 0.7,
-        max_tokens: 1000
-      }
-    });
-
-    // Reset form
-    createForm.value = {
-      name: '',
-      system_prompt: '',
-      model: '',
-    };
-    showCreateForm.value = false;
-
-    // Navigate to edit page
-    await router.push(`/agents/${newAgent.id}`);
-  } catch (error) {
-    console.error('Error creating agent:', error);
-  } finally {
-    creatingAgent.value = false;
-  }
-};
 
 // Handle authentication
 const handleAuthenticated = () => {
@@ -440,12 +322,15 @@ const getAgentStatsTextColor = (agent: Agent) => {
 }
 
 const getAgentStats = (agent: Agent) => {
-  // Mock stats - in real app these would come from API or analytics
+  // Real data from agent
+  const statusLabel = agent.status === 'published' ? 'Опубликован' : 'Черновик';
+  const modelName = agent.model?.split(':')[1] || agent.model || 'Не указана';
+  
   return [
-    { value: Math.floor(Math.random() * 2000 + 500).toLocaleString(), label: 'Обработано запросов' },
-    { value: `${Math.floor(Math.random() * 10 + 90)}%`, label: 'Успешных ответов' },
-    { value: `${(Math.random() * 2 + 0.5).toFixed(1)}s`, label: 'Среднее время' },
-    { value: '24/7', label: 'Доступность' }
+    { value: statusLabel, label: 'Статус' },
+    { value: modelName, label: 'Модель' },
+    { value: agent.version?.toString() || '1', label: 'Версия' },
+    { value: new Date(agent.updated_at).toLocaleDateString('ru-RU'), label: 'Обновлен' }
   ]
 }
 </script>

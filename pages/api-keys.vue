@@ -179,10 +179,6 @@
             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
           </div>
 
-          <div v-else-if="apiKeysError" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p class="text-red-800">{{ apiKeysError }}</p>
-          </div>
-
           <div v-else-if="apiKeys.length === 0" class="text-center py-12">
             <Key class="h-12 w-12 text-slate-400 mx-auto mb-4" />
             <h3 class="text-lg font-medium text-slate-900 mb-2">Нет API ключей</h3>

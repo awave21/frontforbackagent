@@ -75,9 +75,15 @@
                     v-model="registerForm.email"
                     type="email"
                     required
-                    class="w-full px-3 py-2 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    :class="[
+                      'w-full px-3 py-2 text-slate-900 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500',
+                      validationErrors.email ? 'border-red-500' : 'border-slate-300'
+                    ]"
                     placeholder="user@example.com"
                   />
+                  <div v-if="validationErrors.email" class="mt-1 text-sm text-red-600">
+                    {{ validationErrors.email.join(', ') }}
+                  </div>
                 </div>
 
                 <div>
@@ -91,7 +97,10 @@
                       required
                       minlength="8"
                       maxlength="128"
-                      class="w-full px-3 py-2 pr-10 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      :class="[
+                        'w-full px-3 py-2 pr-10 text-slate-900 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500',
+                        validationErrors.password ? 'border-red-500' : 'border-slate-300'
+                      ]"
                       placeholder="Минимум 8 символов"
                     />
                     <button
@@ -130,6 +139,9 @@
                   </div>
                   <div v-if="registerForm.password && registerForm.confirmPassword && registerForm.password !== registerForm.confirmPassword" class="mt-1 text-sm text-red-600">
                     Пароли не совпадают
+                  </div>
+                  <div v-if="validationErrors.confirmPassword" class="mt-1 text-sm text-red-600">
+                    {{ validationErrors.confirmPassword.join(', ') }}
                   </div>
                 </div>
 
@@ -176,15 +188,21 @@
               <form v-if="authMethod === 'login'" @submit.prevent="handleUserLogin" class="space-y-4">
                 <div>
                   <label class="block text-sm font-medium text-slate-700 mb-2">
-                    Логин (API Ключ)
+                    Email
                   </label>
                   <input
-                    v-model="loginForm.username"
-                    type="text"
+                    v-model="loginForm.email"
+                    type="email"
                     required
-                    class="w-full px-3 py-2 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="Введите ваш логин или API ключ"
+                    :class="[
+                      'w-full px-3 py-2 text-slate-900 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500',
+                      validationErrors.email ? 'border-red-500' : 'border-slate-300'
+                    ]"
+                    placeholder="Введите ваш email"
                   />
+                  <div v-if="validationErrors.email" class="mt-1 text-sm text-red-600">
+                    {{ validationErrors.email.join(', ') }}
+                  </div>
                 </div>
 
                 <div>
@@ -196,8 +214,13 @@
                       v-model="loginForm.password"
                       :type="showLoginPassword ? 'text' : 'password'"
                       required
-                      class="w-full px-3 py-2 pr-10 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                      placeholder="Введите пароль"
+                      minlength="8"
+                      maxlength="128"
+                      :class="[
+                        'w-full px-3 py-2 pr-10 text-slate-900 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500',
+                        validationErrors.password ? 'border-red-500' : 'border-slate-300'
+                      ]"
+                      placeholder="Минимум 8 символов"
                     />
                     <button
                       type="button"
@@ -219,13 +242,6 @@
                   {{ isLoading ? 'Вход...' : 'Войти' }}
                 </button>
               </form>
-
-
-
-              <!-- Ошибка -->
-              <div v-if="error" class="mt-4 text-red-600 text-sm bg-red-50 p-3 rounded-lg">
-                {{ error }}
-              </div>
             </div>
           </div>
         </Transition>
@@ -237,7 +253,8 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { X, Loader2, Eye, EyeOff } from 'lucide-vue-next'
-import { useAuth } from '../composables/useAuth'
+import { useAuth, type ApiError } from '../composables/useAuth'
+import { useToast } from '../composables/useToast'
 
 interface Props {
   isOpen: boolean
@@ -250,11 +267,15 @@ const emit = defineEmits<{
 }>()
 
 const { register, login, isLoading, error } = useAuth()
+const { error: showError, success: showSuccess } = useToast()
+
+// Ошибки валидации для отображения в формах
+const validationErrors = ref<Record<string, string[]>>({})
 
 // Метод аутентификации
 const authMethod = ref<'register' | 'login'>('register')
 const loginForm = ref({
-  username: '',
+  email: '',
   password: ''
 })
 const registerForm = ref({
@@ -273,32 +294,108 @@ const showLoginPassword = ref(false)
 
 // Обработчик регистрации
 const handleRegister = async () => {
+  // Очищаем предыдущие ошибки
+  validationErrors.value = {}
+  
   // Проверяем, что пароли совпадают
   if (registerForm.value.password !== registerForm.value.confirmPassword) {
-    alert('Пароли не совпадают')
+    showError('Ошибка валидации', 'Пароли не совпадают')
+    validationErrors.value.confirmPassword = ['Пароли не совпадают']
     return
   }
 
   try {
     await register(registerForm.value)
+    showSuccess('Успешно', 'Вы успешно зарегистрированы')
     emit('authenticated')
     emit('close')
-  } catch (err) {
-    console.error('Ошибка регистрации:', err)
+  } catch (err: any) {
+    const apiError: ApiError = err.apiError || {
+      error: 'unknown_error',
+      message: err.message || 'Ошибка регистрации'
+    }
+    
+    // Если есть детали валидации, показываем их под полями
+    if (apiError.details) {
+      validationErrors.value = apiError.details
+      // Показываем toast с общей ошибкой
+      showError('Ошибка регистрации', apiError.message)
+    } else {
+      // Показываем toast с ошибкой
+      if (apiError.error === 'email_exists') {
+        showError('Ошибка регистрации', 'Пользователь с таким email уже существует')
+      } else if (apiError.error === 'rate_limit_exceeded') {
+        const retryAfter = apiError.retry_after || 60
+        showError(
+          'Превышен лимит запросов',
+          `Попробуйте снова через ${retryAfter} секунд`
+        )
+      } else {
+        showError('Ошибка регистрации', apiError.message)
+      }
+    }
   }
 }
 
 // Обработчик входа пользователя
 const handleUserLogin = async () => {
+  // Очищаем предыдущие ошибки
+  validationErrors.value = {}
+  
+  // Валидация на frontend
+  if (!loginForm.value.email || !loginForm.value.password) {
+    showError('Ошибка валидации', 'Пожалуйста, заполните все поля')
+    return
+  }
+
+  if (loginForm.value.password.length < 8) {
+    showError('Ошибка валидации', 'Пароль должен содержать минимум 8 символов')
+    validationErrors.value.password = ['Пароль должен содержать минимум 8 символов']
+    return
+  }
+
+  // Простая валидация email
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(loginForm.value.email)) {
+    showError('Ошибка валидации', 'Пожалуйста, введите корректный email адрес')
+    validationErrors.value.email = ['Некорректный формат email']
+    return
+  }
+
   try {
     await login({
-      email: loginForm.value.username,
+      email: loginForm.value.email,
       password: loginForm.value.password
     })
+    showSuccess('Успешно', 'Вы успешно вошли в систему')
     emit('authenticated')
     emit('close')
-  } catch (err) {
-    console.error('Ошибка входа:', err)
+  } catch (err: any) {
+    const apiError: ApiError = err.apiError || {
+      error: 'unknown_error',
+      message: err.message || 'Ошибка входа'
+    }
+    
+    // Если есть детали валидации, показываем их под полями
+    if (apiError.details) {
+      validationErrors.value = apiError.details
+      showError('Ошибка входа', apiError.message)
+    } else {
+      // Показываем toast с ошибкой
+      if (apiError.error === 'invalid_credentials') {
+        showError('Ошибка входа', 'Неверный email или пароль')
+      } else if (apiError.error === 'account_inactive') {
+        showError('Ошибка входа', 'Аккаунт неактивен')
+      } else if (apiError.error === 'rate_limit_exceeded') {
+        const retryAfter = apiError.retry_after || 60
+        showError(
+          'Превышен лимит запросов',
+          `Слишком много попыток входа. Попробуйте снова через ${retryAfter} секунд`
+        )
+      } else {
+        showError('Ошибка входа', apiError.message)
+      }
+    }
   }
 }
 
@@ -306,7 +403,7 @@ const handleUserLogin = async () => {
 watch(() => props.isOpen, (isOpen) => {
   if (!isOpen) {
     loginForm.value = {
-      username: '',
+      email: '',
       password: ''
     }
     registerForm.value = {
@@ -316,6 +413,7 @@ watch(() => props.isOpen, (isOpen) => {
       full_name: '',
       tenant_name: ''
     }
+    validationErrors.value = {}
     showPassword.value = false
     showConfirmPassword.value = false
     showLoginPassword.value = false

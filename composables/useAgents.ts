@@ -1,6 +1,43 @@
-import { getAuthHeaders, useApiFetch } from './useApiFetch'
+import { ref, readonly } from 'vue'
+import { useApiFetch } from './useApiFetch'
+import { useAuth } from './useAuth'
 
 export type AgentStatus = 'draft' | 'published'
+
+export type SqnsTool = {
+  name: string
+  description?: string
+  requiredFields?: string[]
+  dataSources?: Record<string, string>
+}
+
+export type SqnsStatus = {
+  sqnsEnabled: boolean
+  sqnsHost?: string
+  sqnsCredentialId?: string
+  sqnsLastSyncAt?: string
+  sqnsStatus?: 'ok' | 'error' | string
+  sqnsError?: string
+  sqnsTools?: SqnsTool[]
+}
+
+export type SqnsResource = {
+  id: number
+  name: string
+  status: string
+}
+
+export type SqnsService = {
+  id: number
+  name: string
+  duration: number
+  price: number
+}
+
+export type SqnsSlot = {
+  datetime: string
+  isAvailable: boolean
+}
 
 export type Agent = {
   id: string
@@ -35,6 +72,12 @@ export const useAgents = () => {
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const agents = ref<Agent[]>([])
+  const sqnsStatus = ref<SqnsStatus | null>(null)
+  const sqnsResources = ref<SqnsResource[]>([])
+  const sqnsServices = ref<SqnsService[]>([])
+  const sqnsSlots = ref<SqnsSlot[]>([])
+  const isSqnsLoading = ref(false)
+  const sqnsError = ref<string | null>(null)
 
   // Получение списка агентов
   const fetchAgents = async (params?: { limit?: number; offset?: number }) => {
@@ -47,7 +90,6 @@ export const useAgents = () => {
       if (params?.offset) queryParams.append('offset', params.offset.toString())
 
       const response = await apiFetch<Agent[]>('/agents', {
-        headers: getAuthHeaders(token.value),
         query: Object.fromEntries(queryParams)
       })
 
@@ -70,7 +112,6 @@ export const useAgents = () => {
       const response = await apiFetch<Agent>('/agents', {
         method: 'POST',
         headers: {
-          ...getAuthHeaders(token.value),
           'Content-Type': 'application/json'
         },
         body: agentData
@@ -94,9 +135,7 @@ export const useAgents = () => {
       isLoading.value = true
       error.value = null
 
-      const response = await apiFetch<Agent>(`/agents/${agentId}`, {
-        headers: getAuthHeaders(token.value)
-      })
+      const response = await apiFetch<Agent>(`/agents/${agentId}`)
 
       return response
     } catch (err: any) {
@@ -116,7 +155,6 @@ export const useAgents = () => {
       const response = await apiFetch<Agent>(`/agents/${agentId}`, {
         method: 'PUT',
         headers: {
-          ...getAuthHeaders(token.value),
           'Content-Type': 'application/json'
         },
         body: updateData
@@ -144,8 +182,7 @@ export const useAgents = () => {
       error.value = null
 
       await apiFetch(`/agents/${agentId}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders(token.value)
+        method: 'DELETE'
       })
 
       // Удалить агента из списка
@@ -159,6 +196,109 @@ export const useAgents = () => {
     }
   }
 
+  const fetchSqnsStatus = async (agentId: string) => {
+    try {
+      isSqnsLoading.value = true
+      sqnsError.value = null
+
+      const response = await apiFetch<SqnsStatus>(`/agents/${agentId}/sqns`)
+
+      sqnsStatus.value = response
+      return response
+    } catch (err: any) {
+      sqnsError.value = err.message || 'Ошибка загрузки SQNS-статуса'
+      throw err
+    } finally {
+      isSqnsLoading.value = false
+    }
+  }
+
+  const enableSqns = async (
+    agentId: string,
+    payload: { host: string; apiKey?: string; email?: string; password?: string; defaultResourceId?: number }
+  ) => {
+    try {
+      isSqnsLoading.value = true
+      sqnsError.value = null
+
+      const response = await apiFetch<SqnsStatus>(`/agents/${agentId}/sqns/enable-by-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: payload
+      })
+
+      sqnsStatus.value = response
+      return response
+    } catch (err: any) {
+      sqnsError.value = err.message || 'Ошибка включения SQNS'
+      throw err
+    } finally {
+      isSqnsLoading.value = false
+    }
+  }
+
+  const disableSqns = async (agentId: string) => {
+    try {
+      isSqnsLoading.value = true
+      sqnsError.value = null
+
+      await apiFetch<void>(`/agents/${agentId}/sqns`, {
+        method: 'DELETE'
+      })
+
+      sqnsStatus.value = { sqnsEnabled: false }
+    } catch (err: any) {
+      sqnsError.value = err.message || 'Ошибка отключения SQNS'
+      throw err
+    } finally {
+      isSqnsLoading.value = false
+    }
+  }
+
+  const fetchSqnsResources = async (agentId: string) => {
+    try {
+      const response = await apiFetch<{ resources: SqnsResource[] }>(`/agents/${agentId}/sqns/resources`)
+
+      sqnsResources.value = response.resources ?? []
+      return sqnsResources.value
+    } catch (err: any) {
+      sqnsError.value = err.message || 'Ошибка загрузки ресурсов SQNS'
+      throw err
+    }
+  }
+
+  const fetchSqnsServices = async (agentId: string) => {
+    try {
+      const response = await apiFetch<{ services: SqnsService[] }>(`/agents/${agentId}/sqns/services`)
+
+      sqnsServices.value = response.services ?? []
+      return sqnsServices.value
+    } catch (err: any) {
+      sqnsError.value = err.message || 'Ошибка загрузки услуг SQNS'
+      throw err
+    }
+  }
+
+  const fetchSqnsSlots = async (agentId: string, params: { resourceId?: number; date?: string }) => {
+    try {
+      const query = new URLSearchParams()
+      if (params.resourceId) query.append('resourceId', params.resourceId.toString())
+      if (params.date) query.append('date', params.date)
+
+      const response = await apiFetch<{ slots: SqnsSlot[] }>(`/agents/${agentId}/sqns/slots`, {
+        query: Object.fromEntries(query)
+      })
+
+      sqnsSlots.value = response.slots ?? []
+      return sqnsSlots.value
+    } catch (err: any) {
+      sqnsError.value = err.message || 'Ошибка загрузки слотов SQNS'
+      throw err
+    }
+  }
+
   return {
     agents: readonly(agents),
     isLoading: readonly(isLoading),
@@ -167,6 +307,18 @@ export const useAgents = () => {
     createAgent,
     getAgent,
     updateAgent,
-    deleteAgent
+    deleteAgent,
+    sqnsStatus: readonly(sqnsStatus),
+    sqnsResources: readonly(sqnsResources),
+    sqnsServices: readonly(sqnsServices),
+    sqnsSlots: readonly(sqnsSlots),
+    isSqnsLoading: readonly(isSqnsLoading),
+    sqnsError: readonly(sqnsError),
+    fetchSqnsStatus,
+    enableSqns,
+    disableSqns,
+    fetchSqnsResources,
+    fetchSqnsServices,
+    fetchSqnsSlots
   }
 }

@@ -1,4 +1,4 @@
-import { getAuthHeaders, useApiFetch } from './useApiFetch'
+import { useApiFetch } from './useApiFetch'
 
 export type ApiKey = {
   id: string
@@ -33,7 +33,6 @@ export const useApiKeys = () => {
       if (params?.include_revoked) queryParams.append('include_revoked', 'true')
 
       const response = await apiFetch<ApiKey[]>('/api-keys', {
-        headers: getAuthHeaders(token.value),
         query: Object.fromEntries(queryParams)
       })
 
@@ -56,7 +55,6 @@ export const useApiKeys = () => {
       const response = await apiFetch<ApiKey>('/api-keys', {
         method: 'POST',
         headers: {
-          ...getAuthHeaders(token.value),
           'Content-Type': 'application/json'
         },
         body: keyData
@@ -81,8 +79,7 @@ export const useApiKeys = () => {
       error.value = null
 
       await apiFetch(`/api-keys/${keyId}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders(token.value)
+        method: 'DELETE'
       })
 
       // Удалить ключ из списка

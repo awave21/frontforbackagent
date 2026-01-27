@@ -29,14 +29,14 @@
         </div>
       </div>
       <div class="flex items-center gap-2">
-        <NuxtLink
+        <button
           v-if="agentId"
-          :to="`/agents/${agentId}`"
+          @click="navigateToAgent"
           class="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-lg text-slate-900 font-medium hover:bg-slate-100 transition-colors"
         >
           <Settings class="h-4 w-4" />
           Настроить
-        </NuxtLink>
+        </button>
         <button
           v-else
           class="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-lg text-slate-900 font-medium"
@@ -66,6 +66,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+// @ts-ignore - navigateTo is auto-imported in Nuxt 3
+import { navigateTo } from '#app'
 import { UserCheck, Activity, FileCheck, Settings, MoreVerticalIcon } from 'lucide-vue-next'
 
 interface Stat {
@@ -99,4 +101,10 @@ const iconComponent = computed(() => {
       return UserCheck
   }
 })
+
+const navigateToAgent = () => {
+  if (props.agentId) {
+    navigateTo(`/agents/${props.agentId}`)
+  }
+}
 </script>
