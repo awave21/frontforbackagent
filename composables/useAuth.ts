@@ -1,6 +1,13 @@
 import { ref, computed, onMounted, readonly } from 'vue'
 import { useApiFetch } from './useApiFetch'
 
+// Глобальный тип для синхронизации refresh промисов между useAuth и useApiFetch
+declare global {
+  interface Window {
+    __refreshTokenPromise?: Promise<boolean> | null
+  }
+}
+
 // Auth interfaces
 export type User = {
   id: string
@@ -52,6 +59,39 @@ export type ApiError = {
 
 // Функция для парсинга ошибок API
 const parseApiError = (err: any): ApiError => {
+  // Проверяем статус код для определения типа ошибки
+  const status = err?.status || err?.statusCode || err?.response?.status || 0
+  
+  // Обработка сетевых ошибок и ошибок шлюза
+  if (status === 502) {
+    return {
+      error: 'bad_gateway',
+      message: 'Сервер временно недоступен. Пожалуйста, попробуйте позже.'
+    }
+  }
+  if (status === 503) {
+    return {
+      error: 'service_unavailable',
+      message: 'Сервис временно недоступен. Пожалуйста, попробуйте позже.'
+    }
+  }
+  if (status === 504) {
+    return {
+      error: 'gateway_timeout',
+      message: 'Превышено время ожидания ответа от сервера. Пожалуйста, попробуйте позже.'
+    }
+  }
+  
+  // Обработка ошибок без ответа (сетевые ошибки)
+  if (!err.response && !err.data && err.message) {
+    if (err.message.includes('fetch') || err.message.includes('network') || err.message.includes('Failed to fetch')) {
+      return {
+        error: 'network_error',
+        message: 'Ошибка сети. Проверьте подключение к интернету и попробуйте снова.'
+      }
+    }
+  }
+  
   if (err.data && typeof err.data === 'object') {
     return {
       error: err.data.error || 'unknown_error',
@@ -142,6 +182,18 @@ export const useAuth = () => {
   const tenant = ref<Tenant | null>(null)
   const isLoading = ref(false)
   const error = ref<string | null>(null)
+  
+  // Промис-кэш для защиты от параллельных refresh запросов
+  // Используем глобальный промис для синхронизации с useApiFetch
+  let refreshPromise: Promise<boolean> | null = null
+  
+  // Синхронизируем с глобальным промисом (для useApiFetch)
+  if (process.client && typeof window !== 'undefined') {
+    // Проверяем, есть ли уже активный refresh из useApiFetch
+    if (window.__refreshTokenPromise) {
+      refreshPromise = window.__refreshTokenPromise
+    }
+  }
 
   // Регистрация нового пользователя
   const register = async (userData: UserRegister) => {
@@ -366,76 +418,165 @@ export const useAuth = () => {
 
 
   // Обновление токена через refresh token
-  const refreshAccessToken = async (): Promise<boolean> => {
+  const refreshAccessToken = async (retryCount = 0): Promise<boolean> => {
     if (!refreshToken.value) {
-      console.warn('No refresh token available')
+      console.warn('⚠️  No refresh token available')
       return false
     }
     
     if (!process.client) return false
     
-    try {
-      isLoading.value = true
-      error.value = null
-      
-      // Используем обычный fetch, чтобы избежать циклической зависимости с apiFetch
-      // @ts-ignore - Nuxt 3 auto-imports
-      const { public: { apiBase } } = useRuntimeConfig()
-      
-      const response = await fetch(`${apiBase}/auth/refresh`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ refresh_token: refreshToken.value })
-      })
-      
-      if (!response.ok) {
-        throw new Error(`Refresh failed with status ${response.status}`)
-      }
-      
-      const data = await response.json() as {
-        token: string
-        refresh_token?: string
-      }
-      
-      token.value = data.token
-      
-      // Обновляем refresh token, если пришел новый
-      if (data.refresh_token) {
-        refreshToken.value = data.refresh_token
-        localStorage.setItem('auth_refresh_token', data.refresh_token)
-      }
-      
-      localStorage.setItem('auth_token', data.token)
-      
-      console.log('✅ Access token refreshed successfully')
-      return true
-    } catch (err: any) {
-      console.error('❌ Failed to refresh token:', err)
-      
-      // Проверяем тип ошибки
-      const status = err?.status || err?.statusCode || err?.response?.status || 
-                     (err?.message?.includes('status') ? parseInt(err.message.match(/\d+/)?.[0] || '0') : 0)
-      
-      // Если это 401 или 403 - refresh token невалиден, делаем logout
-      if (status === 401 || status === 403) {
-        console.warn('Refresh token invalid or expired, logging out')
-        logout()
-      } else if (status === 500) {
-        // Если 500 - проблема на сервере, не делаем logout
-        // Пользователь может продолжать работать со старым токеном
-        console.warn('⚠️  Server error during token refresh (500), keeping current session')
-        console.warn('   Пользователь может продолжать работу, но сессия может прерваться при истечении токена')
-      } else {
-        // Другие ошибки - не делаем logout, возможно временная проблема
-        console.warn('⚠️  Error during token refresh, keeping current session')
-      }
-      
-      return false
-    } finally {
-      isLoading.value = false
+    // Если уже идет refresh, ждем его результат (защита от race condition)
+    if (refreshPromise) {
+      console.log('🔄 Refresh already in progress, waiting for result...')
+      return refreshPromise
     }
+    
+    // Проверяем глобальный промис (из useApiFetch)
+    if (process.client && typeof window !== 'undefined' && window.__refreshTokenPromise) {
+      console.log('🔄 Refresh already in progress (from useApiFetch), waiting for result...')
+      refreshPromise = window.__refreshTokenPromise
+      return refreshPromise
+    }
+    
+    // Создаем промис для refresh
+    refreshPromise = (async () => {
+      try {
+        isLoading.value = true
+        error.value = null
+        
+        const currentRefreshToken = refreshToken.value
+        if (!currentRefreshToken) {
+          console.warn('⚠️  Refresh token lost during refresh attempt')
+          return false
+        }
+        
+        console.log(`🔄 Attempting to refresh token (attempt ${retryCount + 1})...`)
+        
+        // Используем обычный fetch, чтобы избежать циклической зависимости с apiFetch
+        // @ts-ignore - Nuxt 3 auto-imports
+        const { public: { apiBase } } = useRuntimeConfig()
+        
+        const response = await fetch(`${apiBase}/auth/refresh`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ refresh_token: currentRefreshToken })
+        })
+        
+        // Обработка 409 Conflict - токен уже обрабатывается другим запросом
+        if (response.status === 409) {
+          console.log('⚠️  Received 409 Conflict - token is being processed by another request')
+          
+          // Если это первый ретрай, ждем и повторяем с экспоненциальной задержкой
+          if (retryCount < 3) {
+            const delay = Math.min(1000 * Math.pow(2, retryCount), 5000) // 1s, 2s, 4s, max 5s
+            console.log(`⏳ Waiting ${delay}ms before retry...`)
+            await new Promise(resolve => setTimeout(resolve, delay))
+            
+            // Очищаем промис и повторяем
+            refreshPromise = null
+            return refreshAccessToken(retryCount + 1)
+          } else {
+            console.error('❌ Max retries reached for 409 Conflict')
+            throw new Error(`Refresh failed with status ${response.status} after ${retryCount + 1} retries`)
+          }
+        }
+        
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => '')
+          let errorData: any = {}
+          try {
+            errorData = errorText ? JSON.parse(errorText) : {}
+          } catch {
+            // Не удалось распарсить JSON
+          }
+          
+          console.error(`❌ Refresh failed with status ${response.status}:`, {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorData
+          })
+          
+          throw {
+            status: response.status,
+            statusCode: response.status,
+            message: `Refresh failed with status ${response.status}`,
+            data: errorData
+          }
+        }
+        
+        const data = await response.json() as {
+          token: string
+          refresh_token?: string
+        }
+        
+        // ВАЖНО: Обновляем refresh token в хранилище (даже если он не изменился)
+        // Бэкенд может вернуть новый refresh_token или тот же самый
+        if (data.refresh_token) {
+          refreshToken.value = data.refresh_token
+          localStorage.setItem('auth_refresh_token', data.refresh_token)
+          console.log('✅ Refresh token updated in storage')
+        } else {
+          console.warn('⚠️  Server did not return refresh_token in response')
+        }
+        
+        // Обновляем access token
+        token.value = data.token
+        localStorage.setItem('auth_token', data.token)
+        
+        console.log('✅ Access token refreshed successfully')
+        return true
+      } catch (err: any) {
+        console.error('❌ Failed to refresh token:', {
+          error: err,
+          message: err?.message,
+          status: err?.status || err?.statusCode
+        })
+        
+        // Проверяем тип ошибки
+        const status = err?.status || err?.statusCode || err?.response?.status || 
+                       (err?.message?.includes('status') ? parseInt(err.message.match(/\d+/)?.[0] || '0') : 0)
+        
+        // Если это 401 или 403 - refresh token невалиден, делаем logout
+        if (status === 401 || status === 403) {
+          console.warn('🔴 Refresh token invalid or expired, logging out')
+          logout()
+        } else if (status === 409) {
+          // 409 уже обработано выше, но на случай если попали сюда
+          console.warn('⚠️  409 Conflict during refresh, will retry if possible')
+          // Не делаем logout для 409, так как это временная проблема
+        } else if (status === 500) {
+          // Если 500 - проблема на сервере, не делаем logout
+          // Пользователь может продолжать работать со старым токеном
+          console.warn('⚠️  Server error during token refresh (500), keeping current session')
+          console.warn('   Пользователь может продолжать работу, но сессия может прерваться при истечении токена')
+        } else {
+          // Другие ошибки - не делаем logout, возможно временная проблема
+          console.warn('⚠️  Error during token refresh, keeping current session')
+        }
+        
+        return false
+      } finally {
+        isLoading.value = false
+        // Очищаем промис после завершения
+        refreshPromise = null
+        // Очищаем глобальный промис
+        if (process.client && typeof window !== 'undefined') {
+          if (window.__refreshTokenPromise === refreshPromise) {
+            window.__refreshTokenPromise = null
+          }
+        }
+      }
+    })()
+    
+    // Сохраняем в глобальный промис для синхронизации с useApiFetch
+    if (process.client && typeof window !== 'undefined') {
+      window.__refreshTokenPromise = refreshPromise
+    }
+    
+    return refreshPromise
   }
 
   // Выход

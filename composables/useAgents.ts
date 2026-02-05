@@ -18,6 +18,7 @@ export type SqnsStatus = {
   sqnsLastSyncAt?: string
   sqnsStatus?: 'ok' | 'error' | string
   sqnsError?: string
+  sqnsWarning?: string | null
   sqnsTools?: SqnsTool[]
 }
 
@@ -28,10 +29,22 @@ export type SqnsResource = {
 }
 
 export type SqnsService = {
-  id: number
+  id: string
   name: string
   duration: number
   price: number
+  price_range?: string
+}
+
+export type SqnsSpecialist = {
+  id: number
+  name: string
+  role?: string
+  email?: string
+  phone?: string
+  services_count?: number
+  linked_services?: number
+  is_active?: boolean
 }
 
 export type SqnsSlot = {
@@ -52,6 +65,7 @@ export type Agent = {
   version: number
   created_at: string
   updated_at: string
+  sqns_warning?: string | null
 }
 
 export type CreateAgentData = {
@@ -281,20 +295,147 @@ export const useAgents = () => {
     }
   }
 
-  const fetchSqnsSlots = async (agentId: string, params: { resourceId?: number; date?: string }) => {
+  const syncSqns = async (agentId: string) => {
+    try {
+      isSqnsLoading.value = true
+      sqnsError.value = null
+      const response = await apiFetch<any>(`/agents/${agentId}/sqns/sync`, {
+        method: 'POST'
+      })
+      return response
+    } catch (err: any) {
+      sqnsError.value = err.message || 'Ошибка синхронизации SQNS'
+      throw err
+    } finally {
+      isSqnsLoading.value = false
+    }
+  }
+
+  const fetchSqnsServicesCached = async (agentId: string, params: {
+    search?: string,
+    category?: string,
+    is_enabled?: boolean,
+    limit?: number,
+    offset?: number
+  }) => {
     try {
       const query = new URLSearchParams()
-      if (params.resourceId) query.append('resourceId', params.resourceId.toString())
-      if (params.date) query.append('date', params.date)
+      if (params.search) query.append('search', params.search)
+      if (params.category) query.append('category', params.category)
+      if (params.is_enabled !== undefined) query.append('is_enabled', params.is_enabled.toString())
+      if (params.limit) query.append('limit', params.limit.toString())
+      if (params.offset) query.append('offset', params.offset.toString())
 
-      const response = await apiFetch<{ slots: SqnsSlot[] }>(`/agents/${agentId}/sqns/slots`, {
+      const response = await apiFetch<{ services: any[], total: number }>(`/agents/${agentId}/sqns/services/cached`, {
         query: Object.fromEntries(query)
       })
-
-      sqnsSlots.value = response.slots ?? []
-      return sqnsSlots.value
+      return response
     } catch (err: any) {
-      sqnsError.value = err.message || 'Ошибка загрузки слотов SQNS'
+      sqnsError.value = err.message || 'Ошибка загрузки кэшированных услуг'
+      throw err
+    }
+  }
+
+  const updateSqnsService = async (agentId: string, serviceId: string, data: { is_enabled?: boolean, priority?: number }) => {
+    try {
+      const url = `/agents/${agentId}/sqns/services/${serviceId}`
+      console.log('🚀 PATCH request:', {
+        url,
+        serviceId,
+        serviceIdType: typeof serviceId,
+        data,
+        dataStringified: JSON.stringify(data)
+      })
+      
+      await apiFetch(url, {
+        method: 'PATCH',
+        body: data
+      })
+      
+      console.log('✅ PATCH success')
+    } catch (err: any) {
+      console.error('❌ PATCH failed:', {
+        error: err,
+        message: err.message,
+        data: err.data,
+        statusCode: err.statusCode,
+        statusMessage: err.statusMessage
+      })
+      sqnsError.value = err.message || 'Ошибка обновления услуги'
+      throw err
+    }
+  }
+
+  const bulkUpdateSqnsServices = async (agentId: string, data: { ids: string[], is_enabled?: boolean, priority?: number }) => {
+    try {
+      await apiFetch(`/agents/${agentId}/sqns/services/bulk`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: data
+      })
+    } catch (err: any) {
+      sqnsError.value = err.message || 'Ошибка массового обновления услуг'
+      throw err
+    }
+  }
+
+  const fetchSqnsCategories = async (agentId: string) => {
+    try {
+      const response = await apiFetch<{ categories: any[] }>(`/agents/${agentId}/sqns/categories`)
+      return response.categories
+    } catch (err: any) {
+      sqnsError.value = err.message || 'Ошибка загрузки категорий'
+      throw err
+    }
+  }
+
+  const fetchSqnsSpecialists = async (agentId: string) => {
+    try {
+      const response = await apiFetch<{ specialists: SqnsSpecialist[] }>(`/agents/${agentId}/sqns/specialists`)
+      return response.specialists
+    } catch (err: any) {
+      sqnsError.value = err.message || 'Ошибка загрузки специалистов'
+      throw err
+    }
+  }
+
+  const updateSqnsCategory = async (agentId: string, categoryId: string, data: { is_enabled?: boolean, priority?: number }) => {
+    try {
+      const url = `/agents/${agentId}/sqns/categories/${categoryId}`
+      console.log('🚀 PATCH category request:', {
+        url,
+        categoryId,
+        categoryIdType: typeof categoryId,
+        data,
+        dataStringified: JSON.stringify(data)
+      })
+      
+      await apiFetch(url, {
+        method: 'PATCH',
+        body: data
+      })
+      
+      console.log('✅ PATCH category success')
+    } catch (err: any) {
+      console.error('❌ PATCH category failed:', {
+        error: err,
+        message: err.message,
+        data: err.data,
+        statusCode: err.statusCode,
+        statusMessage: err.statusMessage
+      })
+      sqnsError.value = err.message || 'Ошибка обновления категории'
+      throw err
+    }
+  }
+
+  const getSqnsDisablePreview = async (agentId: string) => {
+    try {
+      return await apiFetch<any>(`/agents/${agentId}/sqns/disable-preview`)
+    } catch (err: any) {
+      sqnsError.value = err.message || 'Ошибка загрузки превью удаления'
       throw err
     }
   }
@@ -319,6 +460,13 @@ export const useAgents = () => {
     disableSqns,
     fetchSqnsResources,
     fetchSqnsServices,
-    fetchSqnsSlots
+    syncSqns,
+    fetchSqnsServicesCached,
+    updateSqnsService,
+    bulkUpdateSqnsServices,
+    fetchSqnsCategories,
+    fetchSqnsSpecialists,
+    updateSqnsCategory,
+    getSqnsDisablePreview
   }
 }

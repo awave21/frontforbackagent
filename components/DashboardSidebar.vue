@@ -126,6 +126,7 @@ import { ref, onMounted } from 'vue'
 import {
   LayoutDashboard,
   Bot,
+  MessageSquare,
   Activity,
   Users,
   Key,
@@ -190,6 +191,11 @@ const menuItems = [
     name: 'Мои агенты',
     path: '/agents',
     icon: Bot
+  },
+  {
+    name: 'Диалоги',
+    path: '/dialogs',
+    icon: MessageSquare
   },
   {
     name: 'Аналитика',

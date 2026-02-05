@@ -1,3 +1,6 @@
+// Nuxt auto-imports $fetch; explicit import for TypeScript
+import { $fetch } from 'ofetch'
+
 // Функция для проверки срока действия JWT токена
 const isTokenExpired = (token: string): boolean => {
   try {
@@ -21,27 +24,40 @@ const isTokenExpired = (token: string): boolean => {
 }
 
 let navigateTo: any = null
-let refreshPromise: Promise<boolean> | null = null
+
+// Глобальный промис-кэш для refresh (синхронизирован с useAuth через window)
+// Это позволяет избежать дублирующих refresh запросов из разных мест
+declare global {
+  interface Window {
+    __refreshTokenPromise?: Promise<boolean> | null
+  }
+}
 
 // Функция для обновления токена через refresh token
+// Использует глобальный промис-кэш для синхронизации с useAuth
 const refreshAccessToken = async (): Promise<boolean> => {
-  if (!process.client) return false
+  if (typeof window === 'undefined') return false
   
   const refreshToken = localStorage.getItem('auth_refresh_token')
   if (!refreshToken) {
-    console.warn('No refresh token available for token refresh')
+    console.warn('⚠️  No refresh token available for token refresh')
     return false
   }
   
-  // Если уже идет обновление, ждем его
-  if (refreshPromise) {
-    return refreshPromise
+  // Проверяем глобальный промис-кэш (используется useAuth)
+  if (window.__refreshTokenPromise) {
+    console.log('🔄 Refresh already in progress (from useAuth), waiting for result...')
+    return window.__refreshTokenPromise
   }
+  
+  // Если useAuth не используется, создаем свой refresh
+  // Но лучше использовать useAuth для единообразия
+  console.warn('⚠️  refreshAccessToken called from useApiFetch - consider using useAuth().refreshAccessToken() instead')
   
   // @ts-ignore - Nuxt 3 auto-imports
   const { public: { apiBase } } = useRuntimeConfig()
   
-  refreshPromise = (async () => {
+  const promise = (async () => {
     try {
       // Используем обычный fetch, чтобы избежать циклической зависимости с $fetch
       const response = await fetch(`${apiBase}/auth/refresh`, {
@@ -52,8 +68,38 @@ const refreshAccessToken = async (): Promise<boolean> => {
         body: JSON.stringify({ refresh_token: refreshToken })
       })
       
-      if (!response.ok) {
+      // Обработка 409 Conflict
+      if (response.status === 409) {
+        console.log('⚠️  Received 409 Conflict - token is being processed, waiting...')
+        // Ждем немного и проверяем глобальный промис
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        if (window.__refreshTokenPromise) {
+          return window.__refreshTokenPromise
+        }
         throw new Error(`Refresh failed with status ${response.status}`)
+      }
+      
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '')
+        let errorData: any = {}
+        try {
+          errorData = errorText ? JSON.parse(errorText) : {}
+        } catch {
+          // Не удалось распарсить JSON
+        }
+        
+        console.error(`❌ Refresh failed with status ${response.status}:`, {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        })
+        
+        throw {
+          status: response.status,
+          statusCode: response.status,
+          message: `Refresh failed with status ${response.status}`,
+          data: errorData
+        }
       }
       
       const data = await response.json() as {
@@ -61,10 +107,13 @@ const refreshAccessToken = async (): Promise<boolean> => {
         refresh_token?: string
       }
       
-      // Обновляем токены
+      // ВАЖНО: Обновляем refresh token в хранилище
       localStorage.setItem('auth_token', data.token)
       if (data.refresh_token) {
         localStorage.setItem('auth_refresh_token', data.refresh_token)
+        console.log('✅ Refresh token updated in storage')
+      } else {
+        console.warn('⚠️  Server did not return refresh_token in response')
       }
       
       console.log('✅ Access token refreshed successfully')
@@ -77,27 +126,37 @@ const refreshAccessToken = async (): Promise<boolean> => {
       
       // Если это 401 или 403 - refresh token невалиден, очищаем все
       if (status === 401 || status === 403) {
-        console.warn('Refresh token invalid or expired, clearing auth data')
+        console.warn('🔴 Refresh token invalid or expired, clearing auth data')
         localStorage.removeItem('auth_token')
         localStorage.removeItem('auth_refresh_token')
         localStorage.removeItem('auth_user')
         localStorage.removeItem('auth_tenant')
+      } else if (status === 409) {
+        // 409 уже обработано выше
+        console.warn('⚠️  409 Conflict during refresh')
       } else if (status === 500) {
         // Если 500 - проблема на сервере, не очищаем токены
-        // Пользователь может продолжать работать со старым токеном
-        console.warn('Server error during token refresh, keeping current tokens')
+        console.warn('⚠️  Server error during token refresh, keeping current tokens')
       } else {
-        // Другие ошибки - очищаем только если это явная ошибка авторизации
-        console.warn('Unknown error during token refresh, keeping current tokens')
+        // Другие ошибки - не очищаем токены
+        console.warn('⚠️  Unknown error during token refresh, keeping current tokens')
       }
       
       return false
-    } finally {
-      refreshPromise = null
     }
   })()
   
-  return refreshPromise
+  // Сохраняем в глобальный промис-кэш СРАЗУ после создания
+  window.__refreshTokenPromise = promise
+  
+  // Очищаем промис после завершения
+  promise.finally(() => {
+    if (window.__refreshTokenPromise === promise) {
+      window.__refreshTokenPromise = null
+    }
+  })
+  
+  return promise
 }
 
 export const useApiFetch = () => {
@@ -105,7 +164,7 @@ export const useApiFetch = () => {
   const { public: { apiBase } } = useRuntimeConfig()
 
   // Инициализируем navigateTo только один раз
-  if (!navigateTo && process.client) {
+  if (!navigateTo && typeof window !== 'undefined') {
     try {
       // @ts-ignore - Nuxt 3 auto-imports
       navigateTo = useNuxtApp().$router?.push || (() => window.location.href = '/')
@@ -113,13 +172,13 @@ export const useApiFetch = () => {
       navigateTo = () => window.location.href = '/'
     }
   }
-  
-  return $fetch.create({
+
+  const apiFetch = $fetch.create({
     baseURL: apiBase,
     async onRequest({ options }) {
       // Автоматически добавляем токен авторизации, если он есть
       // Получаем токен динамически при каждом запросе
-      if (process.client) {
+      if (typeof window !== 'undefined') {
         let token = localStorage.getItem('auth_token')
         
         // Проверяем валидность токена перед использованием
@@ -149,13 +208,22 @@ export const useApiFetch = () => {
       }
     },
     async onResponseError({ request, response, options }) {
+      const retryOptions = options as any
+
       // Если получили 401, пробуем обновить токен и повторить запрос
-      if (response.status === 401 && process.client) {
+      if (response.status === 401 && typeof window !== 'undefined') {
+        // Защита от бесконечного цикла ретраев
+        if (retryOptions?._retry) {
+          console.warn('🔴 Request retried and still unauthorized, redirecting to login')
+        } else {
+          retryOptions._retry = true
+        }
+
         const refreshToken = localStorage.getItem('auth_refresh_token')
         
         // Пробуем обновить токен, если есть refresh token
-        if (refreshToken) {
-          console.log('Received 401, attempting to refresh token...')
+        if (refreshToken && !retryOptions?._forceLogout) {
+          console.log('🔐 Received 401, attempting to refresh token...')
           const refreshed = await refreshAccessToken()
           
           if (refreshed) {
@@ -168,17 +236,16 @@ export const useApiFetch = () => {
                 ...existingHeaders,
                 Authorization: `Bearer ${newToken}`
               }
-              
-              // Повторяем запрос (но это не работает напрямую в onResponseError)
-              // Вместо этого просто возвращаем, чтобы вызывающий код мог повторить запрос
-              console.log('Token refreshed, request should be retried by caller')
-              return
+
+              // Повторяем запрос с обновлённым токеном
+              console.log('✅ Token refreshed, retrying original request')
+              return await apiFetch(request as any, options as any)
             }
           }
         }
         
         // Если refresh не удался или нет refresh token, очищаем и перенаправляем
-        console.warn('Authentication token expired or invalid, redirecting to login')
+        console.warn('🔴 Authentication token expired or invalid, redirecting to login')
         localStorage.removeItem('auth_token')
         localStorage.removeItem('auth_refresh_token')
         localStorage.removeItem('auth_user')
@@ -190,16 +257,72 @@ export const useApiFetch = () => {
           window.location.href = '/'
         }
       }
+      
+      // Обработка 409 Conflict - только для auth-запросов (token refresh)
+      // Для других запросов 409 означает бизнес-конфликт (например, "ресурс уже существует")
+      const requestUrl = typeof request === 'string' ? request : (request as Request).url
+      const isAuthRequest = requestUrl.includes('/auth/')
+      
+      if (response.status === 409 && typeof window !== 'undefined' && isAuthRequest) {
+        console.log('⚠️  Received 409 Conflict on auth request - token refresh in progress, waiting...')
+        const refreshToken = localStorage.getItem('auth_refresh_token')
+        
+        if (refreshToken) {
+          // Ждем завершения активного refresh
+          if (window.__refreshTokenPromise) {
+            console.log('⏳ Waiting for active refresh to complete...')
+            await window.__refreshTokenPromise
+            
+            // После завершения refresh, повторяем запрос с новым токеном
+            const newToken = localStorage.getItem('auth_token')
+            if (newToken) {
+              const existingHeaders = (options.headers as unknown as Record<string, string>) || {}
+              ;(options as any).headers = {
+                ...existingHeaders,
+                Authorization: `Bearer ${newToken}`
+              }
+              // Защита от бесконечного цикла ретраев
+              if (!retryOptions?._retry) retryOptions._retry = true
+              console.log('✅ Refresh completed, retrying original request')
+              return await apiFetch(request as any, options as any)
+            }
+          }
+        }
+      }
 
       // Обработка 429 (Rate Limiting)
       // Ошибка будет обработана в компоненте через apiError.retry_after
       // Здесь только логируем для отладки
-      if (response.status === 429 && process.client) {
+      if (response.status === 429 && typeof window !== 'undefined') {
         const retryAfter = response.headers?.get('retry-after') || '60'
         console.warn(`Rate limit exceeded. Retry after ${retryAfter} seconds`)
       }
+
+      // Обработка 502, 503, 504 - Gateway/Server errors
+      if ([502, 503, 504].includes(response.status) && typeof window !== 'undefined') {
+        const statusText = response.status === 502 ? 'Bad Gateway' 
+                         : response.status === 503 ? 'Service Unavailable'
+                         : 'Gateway Timeout'
+        console.error(`❌ ${statusText} (${response.status}):`, {
+          url: request,
+          status: response.status,
+          statusText: response.statusText,
+          message: `Backend server is not responding. Please try again later.`
+        })
+      }
+
+      // Логируем все остальные ошибки для отладки
+      if (typeof window !== 'undefined' && response.status >= 500) {
+        console.error(`❌ Server error (${response.status}):`, {
+          url: request,
+          status: response.status,
+          statusText: response.statusText
+        })
+      }
     }
   })
+
+  return apiFetch
 }
 
 export const getAuthHeaders = (token?: string | null): Record<string, string> =>

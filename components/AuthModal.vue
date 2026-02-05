@@ -320,20 +320,24 @@ const handleRegister = async () => {
       validationErrors.value = apiError.details
       // Показываем toast с общей ошибкой
       showError('Ошибка регистрации', apiError.message)
-    } else {
-      // Показываем toast с ошибкой
-      if (apiError.error === 'email_exists') {
-        showError('Ошибка регистрации', 'Пользователь с таким email уже существует')
-      } else if (apiError.error === 'rate_limit_exceeded') {
-        const retryAfter = apiError.retry_after || 60
-        showError(
-          'Превышен лимит запросов',
-          `Попробуйте снова через ${retryAfter} секунд`
-        )
       } else {
-        showError('Ошибка регистрации', apiError.message)
+        // Показываем toast с ошибкой
+        if (apiError.error === 'email_exists') {
+          showError('Ошибка регистрации', 'Пользователь с таким email уже существует')
+        } else if (apiError.error === 'rate_limit_exceeded') {
+          const retryAfter = apiError.retry_after || 60
+          showError(
+            'Превышен лимит запросов',
+            `Попробуйте снова через ${retryAfter} секунд`
+          )
+        } else if (apiError.error === 'bad_gateway' || apiError.error === 'service_unavailable' || apiError.error === 'gateway_timeout') {
+          showError('Сервер недоступен', apiError.message)
+        } else if (apiError.error === 'network_error') {
+          showError('Ошибка сети', apiError.message)
+        } else {
+          showError('Ошибка регистрации', apiError.message)
+        }
       }
-    }
   }
 }
 
@@ -380,22 +384,26 @@ const handleUserLogin = async () => {
     if (apiError.details) {
       validationErrors.value = apiError.details
       showError('Ошибка входа', apiError.message)
-    } else {
-      // Показываем toast с ошибкой
-      if (apiError.error === 'invalid_credentials') {
-        showError('Ошибка входа', 'Неверный email или пароль')
-      } else if (apiError.error === 'account_inactive') {
-        showError('Ошибка входа', 'Аккаунт неактивен')
-      } else if (apiError.error === 'rate_limit_exceeded') {
-        const retryAfter = apiError.retry_after || 60
-        showError(
-          'Превышен лимит запросов',
-          `Слишком много попыток входа. Попробуйте снова через ${retryAfter} секунд`
-        )
       } else {
-        showError('Ошибка входа', apiError.message)
+        // Показываем toast с ошибкой
+        if (apiError.error === 'invalid_credentials') {
+          showError('Ошибка входа', 'Неверный email или пароль')
+        } else if (apiError.error === 'account_inactive') {
+          showError('Ошибка входа', 'Аккаунт неактивен')
+        } else if (apiError.error === 'rate_limit_exceeded') {
+          const retryAfter = apiError.retry_after || 60
+          showError(
+            'Превышен лимит запросов',
+            `Слишком много попыток входа. Попробуйте снова через ${retryAfter} секунд`
+          )
+        } else if (apiError.error === 'bad_gateway' || apiError.error === 'service_unavailable' || apiError.error === 'gateway_timeout') {
+          showError('Сервер недоступен', apiError.message)
+        } else if (apiError.error === 'network_error') {
+          showError('Ошибка сети', apiError.message)
+        } else {
+          showError('Ошибка входа', apiError.message)
+        }
       }
-    }
   }
 }
 

@@ -13,9 +13,11 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE || "/api/v1",
-      siteUrl: process.env.NUXT_PUBLIC_SITE_URL || "https://front.agentsapp.integration-ai.ru",
-      domain: process.env.NUXT_PUBLIC_DOMAIN || "front.agentsapp.integration-ai.ru",
+      // Значения по умолчанию для development
+      // В production переопределяются через NUXT_PUBLIC_* переменные окружения или .env
+      apiBase: "/api/v1",
+      siteUrl: "http://localhost:3000",
+      domain: "localhost",
     },
   },
 

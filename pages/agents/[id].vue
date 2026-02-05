@@ -224,6 +224,109 @@
               </div>
             </div>
 
+            <!-- Tab Content: Channels -->
+            <div v-else-if="activeTab === 'channels'" class="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm space-y-6">
+              <div class="mb-6">
+                <h3 class="text-lg font-bold text-slate-900">Каналы связи</h3>
+                <p class="text-sm text-slate-500 mt-1">
+                  Подключите мессенджеры и другие каналы для общения с вашими клиентами через агента.
+                </p>
+              </div>
+
+              <div v-if="loadingChannels" class="flex justify-center py-12">
+                <Loader2 class="w-8 h-8 animate-spin text-indigo-600" />
+              </div>
+
+              <div v-else class="space-y-5">
+                <!-- Telegram Bot -->
+                <div
+                  class="p-6 border rounded-2xl transition-all"
+                  :class="[
+                    telegramChannel
+                      ? 'border-indigo-100 bg-indigo-50/30'
+                      : 'border-slate-100 bg-white hover:border-slate-200'
+                  ]"
+                >
+                  <div class="flex items-start justify-between">
+                    <div class="flex gap-4">
+                      <div class="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center shadow-sm">
+                        <Send class="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h4 class="font-bold text-slate-900">Telegram Bot</h4>
+                        <p class="text-sm text-slate-500 mt-1">
+                          Подключите Telegram-бота для автоматического общения с клиентами.
+                        </p>
+                        <div v-if="telegramChannel" class="mt-3">
+                          <span
+                            class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
+                            :class="telegramChannel.webhook_enabled ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'"
+                          >
+                            {{ telegramChannel.webhook_enabled ? 'Активен' : 'Неактивен' }}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      v-if="telegramChannel"
+                      @click="showChannelEditSheet = true"
+                      class="px-4 py-2 rounded-xl text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-sm"
+                    >
+                      Настроить
+                    </button>
+                    <button
+                      v-else
+                      @click="showChannelEditSheet = true"
+                      class="px-4 py-2 rounded-xl text-sm font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+                    >
+                      Подключить
+                    </button>
+                  </div>
+                </div>
+
+                <!-- WhatsApp (Coming Soon) -->
+                <div class="p-6 border border-slate-100 rounded-2xl bg-slate-50/50 opacity-60">
+                  <div class="flex items-start justify-between">
+                    <div class="flex gap-4">
+                      <div class="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center shadow-sm">
+                        <MessageSquare class="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h4 class="font-bold text-slate-900">WhatsApp</h4>
+                        <p class="text-sm text-slate-500 mt-1">
+                          Интеграция с WhatsApp Business API для общения с клиентами.
+                        </p>
+                      </div>
+                    </div>
+                    <span class="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-200 text-slate-500 uppercase">
+                      Скоро
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Web Widget (Coming Soon) -->
+                <div class="p-6 border border-slate-100 rounded-2xl bg-slate-50/50 opacity-60">
+                  <div class="flex items-start justify-between">
+                    <div class="flex gap-4">
+                      <div class="w-12 h-12 bg-gradient-to-br from-purple-400 to-purple-600 rounded-xl flex items-center justify-center shadow-sm">
+                        <MessageSquare class="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h4 class="font-bold text-slate-900">Виджет на сайт</h4>
+                        <p class="text-sm text-slate-500 mt-1">
+                          Встраиваемый чат-виджет для вашего сайта.
+                        </p>
+                      </div>
+                    </div>
+                    <span class="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-200 text-slate-500 uppercase">
+                      Скоро
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- Tab Content: Chat -->
             <div v-else-if="activeTab === 'chat'" class="flex flex-col h-[600px] bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
               <!-- Chat Header -->
@@ -689,6 +792,16 @@
     @close="showSqnsModal = false"
     @submit="handleSqnsSubmit"
   />
+  
+  <ChannelEditSheet
+    v-if="agent"
+    :open="showChannelEditSheet"
+    :agent-id="agent.id"
+    :current-token="telegramChannel?.bot_token"
+    @update:open="showChannelEditSheet = $event"
+    @saved="handleChannelSaved"
+    @deleted="handleChannelDeleted"
+  />
   </div>
 </template>
 
@@ -722,7 +835,8 @@ import {
   X,
   Send,
   ChevronDown,
-  Wrench
+  Wrench,
+  Radio
 } from 'lucide-vue-next'
 // @ts-ignore - Nuxt 3 auto-imports
 import { useAgents, type Agent, type AgentStatus } from '../../composables/useAgents'
@@ -733,6 +847,7 @@ import { useAgentSession } from '../../composables/useAgentSession'
 import { useToast } from '../../composables/useToast'
 import SQNSModal from '../../components/SQNSModal.vue'
 import IntegrationCard from '../../components/IntegrationCard.vue'
+import ChannelEditSheet from '../../components/ChannelEditSheet.vue'
 
 // Route and composables
 const route = useRoute()
@@ -773,6 +888,16 @@ const loadingTools = ref(false)
 const showSqnsModal = ref(false)
 const isSqnsSubmitting = ref(false)
 const sqnsHintsLoaded = ref(false)
+
+// Channels state
+const telegramChannel = ref<{
+  id?: string
+  bot_token?: string
+  webhook_enabled?: boolean
+  webhook_endpoint?: string
+} | null>(null)
+const loadingChannels = ref(false)
+const showChannelEditSheet = ref(false)
 
 const fetchToolsData = async () => {
   if (!agent.value) return
@@ -1071,6 +1196,7 @@ const clearChat = async () => {
 
 const tabs = [
   { id: 'prompt', label: 'Системный промпт', icon: Sparkles },
+  { id: 'channels', label: 'Каналы', icon: Radio },
   { id: 'connections', label: 'Подключения', icon: Link },
   { id: 'knowledge', label: 'База знаний', icon: Database },
   { id: 'model', label: 'Модель', icon: Cpu },
@@ -1192,11 +1318,52 @@ const handleSqnsDisable = async () => {
   }
 }
 
+const fetchChannels = async () => {
+  if (!agent.value) return
+  loadingChannels.value = true
+  console.log('🔌 Fetching active channels for agent:', agent.value.id)
+  try {
+    const channels = await apiFetch<any[]>(`/agents/${agent.value.id}/channels/active`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token.value}` }
+    })
+    console.log('🔌 Active channels response:', channels)
+    const tg = channels.find((ch: any) => ch.type === 'telegram')
+    console.log('🔌 Telegram channel:', tg)
+    telegramChannel.value = tg ? {
+      id: tg.id,
+      bot_token: tg.telegram_bot_token,
+      webhook_enabled: tg.telegram_webhook_enabled,
+      webhook_endpoint: tg.telegram_webhook_endpoint
+    } : null
+  } catch (err: any) {
+    console.error('❌ Failed to fetch channels:', err)
+    telegramChannel.value = null
+  } finally {
+    loadingChannels.value = false
+  }
+}
+
+const handleChannelSaved = async () => {
+  await fetchChannels()
+  showChannelEditSheet.value = false
+  toastSuccess('Канал обновлён', 'Настройки Telegram успешно сохранены')
+}
+
+const handleChannelDeleted = async () => {
+  telegramChannel.value = null
+  showChannelEditSheet.value = false
+  toastSuccess('Канал удалён', 'Подключение Telegram отключено')
+}
+
 watch(activeTab, (newTab) => {
   if (newTab === 'connections') {
     fetchToolsData()
     loadSqnsStatusForAgent()
     ensureSqnsHints()
+  }
+  if (newTab === 'channels') {
+    fetchChannels()
   }
 })
 
@@ -1238,6 +1405,9 @@ onMounted(async () => {
     // Load tools data for the prompt dropdown
     await fetchToolsData()
     await loadSqnsStatusForAgent()
+    
+    // Load channels data
+    await fetchChannels()
     
     // Load persisted messages
     loadMessages()
