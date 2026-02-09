@@ -68,7 +68,7 @@
     <!-- Empty State -->
     <div 
       v-else-if="items.length === 0 && !globalFilter && !isAddingRow" 
-      class="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm"
+      class="bg-background rounded-md border border-border p-12 text-center"
     >
       <div class="max-w-md mx-auto">
         <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -81,13 +81,13 @@
         <div class="flex items-center justify-center gap-3">
           <button
             @click="startAddingRow"
-            class="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors"
+            class="px-5 py-2.5 bg-indigo-600 text-white rounded-md text-sm font-bold hover:bg-indigo-700 transition-colors"
           >
             Добавить запись
           </button>
           <button
             @click="$emit('import')"
-            class="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors"
+            class="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-md text-sm font-medium hover:bg-slate-50 transition-colors"
           >
             Загрузить CSV
           </button>
@@ -98,7 +98,7 @@
     <!-- No Results -->
     <div 
       v-else-if="table.getRowModel().rows.length === 0 && globalFilter && !isAddingRow" 
-      class="bg-white rounded-2xl border border-slate-200 p-8 text-center shadow-sm"
+      class="bg-background rounded-md border border-border p-8 text-center"
     >
       <p class="text-slate-500">Ничего не найдено по запросу "{{ globalFilter }}"</p>
     </div>

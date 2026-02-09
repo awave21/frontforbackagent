@@ -17,7 +17,7 @@
           <input
             v-model.trim="form.name"
             type="text"
-            class="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all"
+            class="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all"
           />
         </div>
 
@@ -26,7 +26,7 @@
           <input
             v-model.trim="form.tool_name"
             type="text"
-            class="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 font-mono focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all"
+            class="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 font-mono focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all"
             :class="{ 'border-yellow-300 bg-yellow-50': toolNameChanged }"
           />
           <p v-if="toolNameChanged" class="mt-1 text-xs text-yellow-600">
@@ -40,7 +40,7 @@
           <textarea
             v-model.trim="form.tool_description"
             rows="3"
-            class="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all resize-none"
+            class="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all resize-none"
           ></textarea>
         </div>
 
@@ -93,7 +93,7 @@
           <label class="text-sm font-medium text-slate-700 mb-3 block">Режим ответа</label>
           <div class="space-y-3">
             <label 
-              class="flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all"
+              class="flex items-start gap-3 p-4 rounded-md border cursor-pointer transition-all"
               :class="[
                 form.response_mode === 'function_result'
                   ? 'border-indigo-300 bg-indigo-50'
@@ -115,7 +115,7 @@
             </label>
             
             <label 
-              class="flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all"
+              class="flex items-start gap-3 p-4 rounded-md border cursor-pointer transition-all"
               :class="[
                 form.response_mode === 'direct_message'
                   ? 'border-indigo-300 bg-indigo-50'
@@ -143,7 +143,7 @@
           <label class="text-sm font-medium text-slate-700 mb-3 block">Тип поиска</label>
           <select
             v-model="form.search_type"
-            class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all"
+            class="w-full rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all"
           >
             <option value="exact">Точный — совпадение ключевых слов</option>
             <option value="fuzzy">Нечёткий — учитывает опечатки</option>
@@ -173,7 +173,7 @@
       <SheetFooter class-name="space-y-3">
         <button
           @click="handleSave"
-          class="w-full px-6 py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+          class="w-full px-6 py-3 bg-indigo-600 text-white rounded-md text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
           :disabled="isSaving || !isValid"
         >
           <Loader2 v-if="isSaving" class="w-4 h-4 animate-spin" />
@@ -182,7 +182,7 @@
         
         <button
           @click="showDeleteConfirm = true"
-          class="w-full px-6 py-3 bg-white border border-red-200 text-red-600 rounded-xl text-sm font-medium hover:bg-red-50 transition-colors"
+          class="w-full px-6 py-3 bg-white border border-red-200 text-red-600 rounded-md text-sm font-medium hover:bg-red-50 transition-colors"
         >
           Удалить справочник
         </button>
@@ -201,13 +201,13 @@
             <div class="flex items-center gap-3 mt-6">
               <button
                 @click="showDeleteConfirm = false"
-                class="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+                class="flex-1 px-4 py-2.5 rounded-md border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
               >
                 Отмена
               </button>
               <button
                 @click="handleDelete"
-                class="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm font-bold hover:bg-red-700 transition-colors"
+                class="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-md text-sm font-bold hover:bg-red-700 transition-colors"
                 :disabled="isDeleting"
               >
                 {{ isDeleting ? 'Удаление...' : 'Удалить' }}

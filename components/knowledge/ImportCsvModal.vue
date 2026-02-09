@@ -15,7 +15,7 @@
         <!-- Step 1: File Upload -->
         <div v-if="step === 'upload'">
           <div
-            class="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center hover:border-indigo-300 hover:bg-indigo-50/30 transition-all cursor-pointer"
+            class="border-2 border-dashed border-slate-200 rounded-md p-8 text-center hover:border-indigo-300 hover:bg-indigo-50/30 transition-all cursor-pointer"
             :class="{ 'border-indigo-400 bg-indigo-50': isDragging }"
             @dragover.prevent="isDragging = true"
             @dragleave.prevent="isDragging = false"
@@ -41,7 +41,7 @@
         <!-- Step 2: Mapping -->
         <div v-else-if="step === 'mapping'" class="space-y-5">
           <!-- File info -->
-          <div class="flex items-center justify-between bg-slate-50 rounded-xl p-4">
+          <div class="flex items-center justify-between bg-slate-50 rounded-md p-4">
             <div class="flex items-center gap-3">
               <div class="w-10 h-10 bg-white rounded-lg flex items-center justify-center border border-slate-200">
                 <FileSpreadsheet class="w-5 h-5 text-emerald-600" />
@@ -182,7 +182,7 @@
         <button
           v-if="step !== 'result'"
           type="button"
-          class="px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+          class="px-5 py-2.5 rounded-md border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
           @click="handleClose"
         >
           Отмена
@@ -190,7 +190,7 @@
         <button
           v-if="step === 'mapping'"
           @click="handleImport"
-          class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+          class="px-6 py-2.5 bg-indigo-600 text-white rounded-md text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
           :disabled="isImporting || !hasValidMapping"
         >
           <Loader2 v-if="isImporting" class="w-4 h-4 animate-spin" />
@@ -199,7 +199,7 @@
         <button
           v-if="step === 'result'"
           @click="handleClose"
-          class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors"
+          class="px-6 py-2.5 bg-indigo-600 text-white rounded-md text-sm font-bold hover:bg-indigo-700 transition-colors"
         >
           Готово
         </button>

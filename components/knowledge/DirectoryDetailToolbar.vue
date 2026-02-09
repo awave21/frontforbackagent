@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-wrap items-center justify-between gap-3 bg-white rounded-xl border border-slate-200 p-3">
+  <div class="flex flex-wrap items-center justify-between gap-3 bg-background rounded-md border border-border p-3">
     <div class="flex items-center gap-2">
       <button
         @click="$emit('addRow')"

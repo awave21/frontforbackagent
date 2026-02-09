@@ -21,7 +21,7 @@
             v-for="tpl in templates"
             :key="tpl.id"
             @click="selectTemplate(tpl.id)"
-            class="flex flex-col items-start p-4 rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition-all text-left group"
+            class="flex flex-col items-start p-4 rounded-md border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition-all text-left group"
             :class="[
               selectedTemplate === tpl.id ? 'border-indigo-400 bg-indigo-50' : '',
               tpl.id === 'ai_generate' ? 'opacity-50 cursor-not-allowed' : ''
@@ -47,7 +47,7 @@
           <button
             :disabled="!selectedTemplate"
             @click="goToDetails"
-            class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            class="px-6 py-2.5 bg-indigo-600 text-white rounded-md text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Далее
           </button>
@@ -84,7 +84,7 @@
               type="text"
               required
               placeholder="Услуги клиники"
-              class="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all"
+              class="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all"
               @input="generateToolNameFromLabel"
             />
           </div>
@@ -100,7 +100,7 @@
                 required
                 placeholder="get_services"
                 pattern="^[a-z][a-z0-9_]*$"
-                class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 font-mono focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all"
+                class="w-full rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 font-mono focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all"
                 :class="{ 'border-red-300 bg-red-50': toolNameError }"
               />
             </div>
@@ -116,7 +116,7 @@
               v-model.trim="form.tool_description"
               rows="3"
               :placeholder="selectedTemplateData?.defaultDescription"
-              class="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all resize-none"
+              class="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all resize-none"
             ></textarea>
             <p class="mt-1 text-xs text-slate-500">
               Помогает агенту понять когда использовать этот справочник
@@ -124,7 +124,7 @@
           </div>
 
           <!-- Preview columns for template-based -->
-          <div v-if="selectedTemplate !== 'custom'" class="bg-slate-50 rounded-xl p-4 border border-slate-100">
+          <div v-if="selectedTemplate !== 'custom'" class="bg-slate-50 rounded-md p-4 border border-slate-100">
             <p class="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Колонки справочника</p>
             <div class="flex flex-wrap gap-2">
               <span
@@ -144,14 +144,14 @@
           <DialogFooter>
             <button
               type="button"
-              class="px-5 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+              class="px-5 py-2.5 rounded-md border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
               @click="handleClose"
             >
               Отмена
             </button>
             <button
               type="submit"
-              class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              class="px-6 py-2.5 bg-indigo-600 text-white rounded-md text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
               :disabled="!isDetailsValid"
             >
               <span>{{ selectedTemplate === 'custom' ? 'Далее' : 'Создать' }}</span>
@@ -189,14 +189,14 @@
         <div class="flex items-center justify-end gap-3 p-6 border-t border-slate-100 bg-slate-50">
           <button
             type="button"
-            class="px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+            class="px-5 py-2.5 rounded-md border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
             @click="handleClose"
           >
             Отмена
           </button>
           <button
             @click="handleSubmit"
-            class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            class="px-6 py-2.5 bg-indigo-600 text-white rounded-md text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
             :disabled="isSubmitting || !isColumnsValid"
           >
             <Loader2 v-if="isSubmitting" class="w-4 h-4 animate-spin" />

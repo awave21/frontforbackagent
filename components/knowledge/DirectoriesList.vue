@@ -4,7 +4,7 @@
     <div class="flex items-center justify-between gap-4">
       <button
         @click="$emit('create')"
-        class="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200"
+        class="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-md text-sm font-bold hover:bg-indigo-700 transition-colors"
       >
         <Plus class="w-4 h-4" />
         Создать справочник
@@ -16,7 +16,7 @@
           v-model="searchQuery"
           type="text"
           placeholder="Поиск..."
-          class="pl-9 pr-4 py-2 w-48 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all"
+          class="pl-9 pr-4 py-2 w-48 text-sm border border-slate-200 rounded-md bg-slate-50 focus:bg-white focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all"
         />
       </div>
     </div>
@@ -29,7 +29,7 @@
     <!-- Error State -->
     <div 
       v-else-if="error"
-      class="bg-red-50 rounded-2xl border border-red-200 p-8 text-center"
+      class="bg-red-50 rounded-md border border-red-200 p-8 text-center"
     >
       <div class="max-w-md mx-auto">
         <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -42,7 +42,7 @@
         </p>
         <button
           @click="$emit('retry')"
-          class="px-5 py-2.5 bg-red-600 text-white rounded-xl text-sm font-bold hover:bg-red-700 transition-colors"
+          class="px-5 py-2.5 bg-red-600 text-white rounded-md text-sm font-bold hover:bg-red-700 transition-colors"
         >
           Повторить
         </button>
@@ -52,7 +52,7 @@
     <!-- Empty State -->
     <div 
       v-else-if="directories.length === 0" 
-      class="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm"
+      class="bg-background rounded-md border border-border p-12 text-center"
     >
       <div class="max-w-md mx-auto">
         <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -64,7 +64,7 @@
         </p>
         <button
           @click="$emit('create')"
-          class="px-6 py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200"
+          class="px-6 py-3 bg-indigo-600 text-white rounded-md text-sm font-bold hover:bg-indigo-700 transition-colors"
         >
           Создать справочник
         </button>
@@ -74,7 +74,7 @@
     <!-- No Results -->
     <div 
       v-else-if="filteredDirectories.length === 0" 
-      class="bg-white rounded-2xl border border-slate-200 p-8 text-center shadow-sm"
+      class="bg-background rounded-md border border-border p-8 text-center"
     >
       <p class="text-slate-500">Ничего не найдено по запросу "{{ searchQuery }}"</p>
     </div>

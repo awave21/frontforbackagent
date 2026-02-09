@@ -30,7 +30,7 @@
               type="text"
               :required="col.required"
               :placeholder="getPlaceholder(col)"
-              class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all"
+              class="w-full rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all"
             />
             
             <!-- Textarea for long text -->
@@ -40,7 +40,7 @@
               :required="col.required"
               :placeholder="getPlaceholder(col)"
               rows="4"
-              class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all resize-none"
+              class="w-full rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all resize-none"
             ></textarea>
             
             <!-- Number input -->
@@ -51,7 +51,7 @@
               :required="col.required"
               placeholder="0"
               step="any"
-              class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all font-mono"
+              class="w-full rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all font-mono"
             />
             
             <!-- Date input -->
@@ -60,13 +60,13 @@
               v-model="form[col.name]"
               type="date"
               :required="col.required"
-              class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all"
+              class="w-full rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all"
             />
             
             <!-- Bool input (checkbox) -->
             <label
               v-else-if="col.type === 'bool'"
-              class="mt-1 flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors"
+              class="mt-1 flex items-center gap-3 cursor-pointer p-3 rounded-md border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors"
             >
               <input
                 v-model="form[col.name]"
@@ -84,14 +84,14 @@
         <SheetFooter class-name="flex items-center gap-3">
           <button
             type="button"
-            class="flex-1 px-5 py-3 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+            class="flex-1 px-5 py-3 rounded-md border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
             @click="handleClose"
           >
             Отмена
           </button>
           <button
             type="submit"
-            class="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+            class="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-md text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             :disabled="isSubmitting"
           >
             <Loader2 v-if="isSubmitting" class="w-4 h-4 animate-spin" />

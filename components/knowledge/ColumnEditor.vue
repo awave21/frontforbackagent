@@ -14,7 +14,7 @@
       </button>
     </div>
 
-    <div v-if="columns.length === 0" class="text-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+    <div v-if="columns.length === 0" class="text-center py-6 bg-slate-50 rounded-md border border-dashed border-slate-200">
       <p class="text-sm text-slate-500">Добавьте хотя бы одну колонку</p>
     </div>
 
@@ -28,7 +28,7 @@
       class="space-y-3"
     >
       <template #item="{ element: col, index }">
-        <div class="bg-white border border-slate-200 rounded-xl p-4 hover:border-slate-300 transition-colors">
+        <div class="bg-white border border-slate-200 rounded-md p-4 hover:border-slate-300 transition-colors">
           <div class="flex items-start gap-3">
             <!-- Drag handle -->
             <button type="button" class="drag-handle p-1 text-slate-400 hover:text-slate-600 cursor-grab mt-1">

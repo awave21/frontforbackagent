@@ -1,6 +1,7 @@
 <template>
+  <TooltipProvider :delay-duration="0">
   <aside
-    class="bg-white border-r border-slate-200 min-h-screen lg:relative fixed inset-y-0 left-0 z-50 transition-all duration-300 ease-in-out"
+    class="bg-white border-r border-slate-200 min-h-screen lg:relative fixed inset-y-0 left-0 z-50 transition-all duration-300 ease-in-out overflow-hidden"
     :class="[isCollapsed ? 'w-20' : 'w-64']"
   >
     <!-- Logo Section -->
@@ -45,57 +46,61 @@
       <ul class="space-y-2">
         <!-- Back Button for Agent Detail -->
         <li v-if="isAgentDetail">
-          <button
-            @click="handleBackToAgents"
-            class="w-full flex items-center text-base sm:text-sm font-medium rounded-lg transition-all duration-200 group relative px-4 py-3 sm:py-2.5 text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-            :class="[isCollapsed ? 'justify-center px-3' : 'px-4']"
-          >
-            <ArrowLeft
-              class="w-5 h-5 shrink-0 transition-transform"
-              :class="[!isCollapsed && 'mr-3']"
-            />
-            <span v-show="!isCollapsed" class="whitespace-nowrap">Назад к агентам</span>
-            <div
-              v-if="isCollapsed"
-              class="absolute left-full ml-2 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 shadow-lg"
-            >
-              Назад к агентам
-            </div>
-          </button>
+          <TooltipRoot :disabled="!isCollapsed">
+            <TooltipTrigger as-child>
+              <button
+                @click="handleBackToAgents"
+                class="w-full flex items-center text-base sm:text-sm font-medium rounded-lg transition-all duration-200 px-4 py-3 sm:py-2.5 text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                :class="[isCollapsed ? 'justify-center px-3' : 'px-4']"
+              >
+                <ArrowLeft
+                  class="w-5 h-5 shrink-0 transition-transform"
+                  :class="[!isCollapsed && 'mr-3']"
+                />
+                <span v-show="!isCollapsed" class="whitespace-nowrap">Назад к агентам</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipPortal>
+              <TooltipContent side="right" :side-offset="8" class="z-[9999] rounded-md bg-white border border-slate-200 px-3 py-1.5 text-sm text-slate-700 shadow-md">
+                Назад к агентам
+              </TooltipContent>
+            </TooltipPortal>
+          </TooltipRoot>
         </li>
 
         <li v-for="item in currentMenuItems" :key="item.name">
-          <NuxtLink
-            :to="item.path"
-            @click="emit('close')"
-            class="flex items-center text-base sm:text-sm font-medium rounded-lg transition-all duration-200 group relative"
-            :class="[
-              $route.path === item.path
-                ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-100'
-                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
-              isCollapsed ? 'px-3 py-3 justify-center' : 'px-4 py-3 sm:py-2.5'
-            ]"
-            :title="isCollapsed ? item.name : ''"
-          >
-            <component
-              :is="item.icon"
-              class="w-5 h-5 shrink-0 transition-transform"
-              :class="[!isCollapsed && 'mr-3']"
-            />
-            <span
-              v-show="!isCollapsed"
-              class="whitespace-nowrap transition-opacity duration-300"
-            >
-              {{ item.name }}
-            </span>
-            
-            <div
-              v-if="isCollapsed"
-              class="absolute left-full ml-2 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 shadow-lg"
-            >
-              {{ item.name }}
-            </div>
-          </NuxtLink>
+          <TooltipRoot :disabled="!isCollapsed">
+            <TooltipTrigger as-child>
+              <NuxtLink
+                :to="item.path"
+                @click="emit('close')"
+                class="flex items-center text-base sm:text-sm font-medium rounded-lg transition-all duration-200"
+                :class="[
+                  $route.path === item.path
+                    ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-100'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
+                  isCollapsed ? 'px-3 py-3 justify-center' : 'px-4 py-3 sm:py-2.5'
+                ]"
+              >
+                <component
+                  :is="item.icon"
+                  class="w-5 h-5 shrink-0 transition-transform"
+                  :class="[!isCollapsed && 'mr-3']"
+                />
+                <span
+                  v-show="!isCollapsed"
+                  class="whitespace-nowrap transition-opacity duration-300"
+                >
+                  {{ item.name }}
+                </span>
+              </NuxtLink>
+            </TooltipTrigger>
+            <TooltipPortal>
+              <TooltipContent side="right" :side-offset="8" class="z-[9999] rounded-md bg-white border border-slate-200 px-3 py-1.5 text-sm text-slate-700 shadow-md">
+                {{ item.name }}
+              </TooltipContent>
+            </TooltipPortal>
+          </TooltipRoot>
         </li>
       </ul>
     </nav>
@@ -106,13 +111,21 @@
       <div class="p-4 sm:p-5">
         <!-- Logout button for collapsed sidebar -->
         <div v-if="isCollapsed" class="flex justify-center mb-3">
-          <button
-            @click="handleLogout"
-            class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-            :title="'Выйти'"
-          >
-            <LogOut class="h-5 w-5" />
-          </button>
+          <TooltipRoot>
+            <TooltipTrigger as-child>
+              <button
+                @click="handleLogout"
+                class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              >
+                <LogOut class="h-5 w-5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipPortal>
+              <TooltipContent side="right" :side-offset="8" class="z-[9999] rounded-md bg-white border border-slate-200 px-3 py-1.5 text-sm text-slate-700 shadow-md">
+                Выйти
+              </TooltipContent>
+            </TooltipPortal>
+          </TooltipRoot>
         </div>
 
         <!-- User info and logout button for expanded sidebar -->
@@ -131,7 +144,7 @@
           <button
             @click="handleLogout"
             class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
-            :title="'Выйти'"
+            title="Выйти"
           >
             <LogOut class="h-5 w-5" />
           </button>
@@ -139,6 +152,7 @@
       </div>
     </div>
   </aside>
+  </TooltipProvider>
 </template>
 
 <script setup lang="ts">
@@ -163,6 +177,13 @@ import {
   Database,
   Cpu
 } from 'lucide-vue-next'
+import {
+  TooltipRoot,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipPortal,
+  TooltipProvider,
+} from 'radix-vue'
 import { useAuth } from '../composables/useAuth'
 
 // Auth composable
