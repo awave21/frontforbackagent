@@ -1,0 +1,306 @@
+<template>
+  <div class="space-y-6">
+    <KnowledgeSubTabs
+      v-model="knowledgeSubTab"
+      :tabs="knowledgeSubTabs"
+    />
+
+    <div v-if="knowledgeSubTab === 'directories'">
+      <div v-if="selectedDirectory">
+        <DirectoryDetail
+          :directory="selectedDirectory"
+          :items="directoryItems"
+          :loading="directoryItemsLoading"
+          @back="handleBackToList"
+          @settings="showDirectorySettingsSheet = true"
+          @add="showItemFormModal = true; editingItem = null"
+          @create="handleCreateItem"
+          @update="handleUpdateItem"
+          @edit="(item: any) => { editingItem = item; showItemFormModal = true }"
+          @delete="handleDeleteItem"
+          @delete-selected="handleDeleteSelectedItems"
+          @import="showImportCsvModal = true"
+          @export="handleExportCsv"
+        />
+      </div>
+      <div v-else>
+        <DirectoriesList
+          :directories="directories"
+          :loading="directoriesLoading"
+          :error="directoriesError"
+          @create="showCreateDirectoryModal = true"
+          @select="handleSelectDirectory"
+          @retry="loadDirectories"
+        />
+      </div>
+    </div>
+
+    <div v-else-if="knowledgeSubTab === 'sqns'">
+      <div v-if="!isSqnsEnabled" class="bg-background rounded-md border border-border p-6 sm:p-8 text-center">
+        <div class="max-w-md mx-auto">
+          <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Database class="h-8 w-8 text-slate-400" />
+          </div>
+          <h3 class="text-lg font-bold text-slate-900">База знаний SQNS</h3>
+          <p class="text-slate-500 mt-2 mb-6">
+            Подключите SQNS интеграцию для управления услугами и категориями.
+          </p>
+          <button
+            @click="navigateTo(`/agents/${agent?.id}/connections`)"
+            class="px-6 py-3 bg-indigo-600 text-white rounded-md text-sm font-bold hover:bg-indigo-700 transition-colors"
+          >
+            Перейти к подключениям
+          </button>
+        </div>
+      </div>
+
+      <div v-else>
+        <SQNSIntegrationManager
+          v-if="agent"
+          :agent-id="agent.id"
+          :status="sqnsStatus?.sqnsStatus === 'error' ? 'error' : 'active'"
+          :last-sync-at="sqnsStatus?.sqnsLastSyncAt"
+          :warning="sqnsStatus?.sqnsWarning"
+          @sync-complete="store.loadSqnsStatusForAgent"
+        />
+      </div>
+    </div>
+
+    <CreateDirectoryModal
+      :is-open="showCreateDirectoryModal"
+      :existing-tool-names="directoriesComposable?.existingToolNames ?? []"
+      @close="showCreateDirectoryModal = false"
+      @submit="handleCreateDirectory"
+    />
+
+    <ItemFormModal
+      v-if="selectedDirectory"
+      :is-open="showItemFormModal"
+      :directory-name="selectedDirectory.name"
+      :columns="selectedDirectory.columns"
+      :edit-item="editingItem"
+      @close="showItemFormModal = false; editingItem = null"
+      @submit="handleSaveItem"
+    />
+
+    <ImportCsvModal
+      v-if="selectedDirectory"
+      :is-open="showImportCsvModal"
+      :directory-name="selectedDirectory.name"
+      :columns="selectedDirectory.columns"
+      @close="showImportCsvModal = false"
+      @import="handleImportCsv"
+    />
+
+    <DirectorySettingsSheet
+      ref="directorySettingsSheetRef"
+      :is-open="showDirectorySettingsSheet"
+      :directory="selectedDirectory"
+      :existing-tool-names="directoriesComposable?.existingToolNames ?? []"
+      @close="showDirectorySettingsSheet = false"
+      @save="handleSaveDirectorySettings"
+      @delete="handleDeleteDirectoryFromSettings"
+    />
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
+import { Database } from 'lucide-vue-next'
+import { navigateTo } from '#app'
+import { useAgentEditorStore } from '~/composables/useAgentEditorStore'
+import { useToast } from '~/composables/useToast'
+import type { Directory } from '~/types/directories'
+import KnowledgeSubTabs from '~/components/knowledge/KnowledgeSubTabs.vue'
+import DirectoriesList from '~/components/knowledge/DirectoriesList.vue'
+import DirectoryDetail from '~/components/knowledge/DirectoryDetail.vue'
+import CreateDirectoryModal from '~/components/knowledge/CreateDirectoryModal.vue'
+import ItemFormModal from '~/components/knowledge/ItemFormModal.vue'
+import ImportCsvModal from '~/components/knowledge/ImportCsvModal.vue'
+import DirectorySettingsSheet from '~/components/knowledge/DirectorySettingsSheet.vue'
+import SQNSIntegrationManager from '~/components/SQNSIntegrationManager.vue'
+
+const store = useAgentEditorStore()
+const { agent, directoriesComposable, isSqnsEnabled, sqnsToolsList, sqnsStatus } = storeToRefs(store)
+const { success: toastSuccess, error: toastError } = useToast()
+
+const knowledgeSubTab = ref<'sqns' | 'directories'>('directories')
+const showCreateDirectoryModal = ref(false)
+const showItemFormModal = ref(false)
+const showImportCsvModal = ref(false)
+const showDirectorySettingsSheet = ref(false)
+const editingItem = ref<any | null>(null)
+const directorySettingsSheetRef = ref<InstanceType<typeof DirectorySettingsSheet> | null>(null)
+
+const directories = computed(() => directoriesComposable.value?.directories ?? [])
+const directoriesLoading = computed(() => directoriesComposable.value?.isLoading ?? false)
+const directoriesError = computed(() => directoriesComposable.value?.error ?? null)
+const directoryItems = computed(() => directoriesComposable.value?.items ?? [])
+const directoryItemsLoading = computed(() => directoriesComposable.value?.isLoadingItems ?? false)
+const selectedDirectory = computed(() => directoriesComposable.value?.currentDirectory ?? null)
+
+const knowledgeSubTabs = computed(() => [
+  { id: 'directories', label: 'Справочники', count: directories.value.length },
+  { id: 'sqns', label: 'SQNS', count: isSqnsEnabled.value ? sqnsToolsList.value.length : undefined }
+])
+
+const loadDirectories = async () => {
+  await store.ensureDirectoriesLoaded()
+}
+
+onMounted(() => {
+  if (knowledgeSubTab.value === 'directories') {
+    store.ensureDirectoriesLoaded()
+  } else {
+    store.ensureSqnsStatusLoaded()
+    store.ensureSqnsHints()
+  }
+})
+
+watch(agent, async (value) => {
+  if (!value) return
+  if (knowledgeSubTab.value === 'directories') {
+    await store.ensureDirectoriesLoaded()
+  } else {
+    await store.ensureSqnsStatusLoaded()
+    await store.ensureSqnsHints()
+  }
+}, { immediate: true })
+
+watch(knowledgeSubTab, async (value) => {
+  if (value === 'directories') {
+    await store.ensureDirectoriesLoaded()
+  } else {
+    await store.ensureSqnsStatusLoaded()
+    await store.ensureSqnsHints()
+  }
+})
+
+const handleCreateDirectory = async (data: any) => {
+  if (!directoriesComposable.value) return
+  try {
+    await directoriesComposable.value.createDirectory(data)
+    showCreateDirectoryModal.value = false
+    toastSuccess('Справочник создан')
+  } catch (err: any) {
+    toastError(err.message || 'Не удалось создать справочник')
+  }
+}
+
+const handleSelectDirectory = (dir: Directory) => {
+  if (directoriesComposable.value) {
+    directoriesComposable.value.setCurrentDirectory(dir)
+  }
+}
+
+const handleBackToList = () => {
+  if (directoriesComposable.value) {
+    directoriesComposable.value.setCurrentDirectory(null)
+  }
+}
+
+const handleSaveItem = async (data: Record<string, any>, itemId?: string) => {
+  if (!directoriesComposable.value || !selectedDirectory.value) return
+  try {
+    if (itemId) {
+      await directoriesComposable.value.updateItem(selectedDirectory.value.id, itemId, data)
+      toastSuccess('Запись обновлена')
+    } else {
+      await directoriesComposable.value.createItem(selectedDirectory.value.id, data)
+      toastSuccess('Запись добавлена')
+    }
+    showItemFormModal.value = false
+    editingItem.value = null
+  } catch (err: any) {
+    toastError(err.message || 'Не удалось сохранить запись')
+  }
+}
+
+const handleCreateItem = async (data: Record<string, any>) => {
+  if (!directoriesComposable.value || !selectedDirectory.value) return
+  try {
+    await directoriesComposable.value.createItem(selectedDirectory.value.id, data)
+    toastSuccess('Запись добавлена')
+  } catch (err: any) {
+    toastError(err.message || 'Не удалось создать запись')
+  }
+}
+
+const handleUpdateItem = async (itemId: string, data: Record<string, any>) => {
+  if (!directoriesComposable.value || !selectedDirectory.value) return
+  try {
+    await directoriesComposable.value.updateItem(selectedDirectory.value.id, itemId, data)
+  } catch (err: any) {
+    toastError(err.message || 'Не удалось обновить запись')
+  }
+}
+
+const handleDeleteItem = async (itemId: string) => {
+  if (!directoriesComposable.value || !selectedDirectory.value) return
+  try {
+    await directoriesComposable.value.deleteItem(selectedDirectory.value.id, itemId)
+    toastSuccess('Запись удалена')
+  } catch (err: any) {
+    toastError(err.message || 'Не удалось удалить запись')
+  }
+}
+
+const handleDeleteSelectedItems = async (ids: string[]) => {
+  if (!directoriesComposable.value || !selectedDirectory.value) return
+  try {
+    await directoriesComposable.value.deleteItems(selectedDirectory.value.id, ids)
+    toastSuccess('Записи удалены')
+  } catch (err: any) {
+    toastError(err.message || 'Не удалось удалить записи')
+  }
+}
+
+const handleImportCsv = async (file: File, mapping: Record<string, string | null>, options: { hasHeader: boolean; replaceAll: boolean }) => {
+  if (!directoriesComposable.value || !selectedDirectory.value) return
+  try {
+    const result = await directoriesComposable.value.importCsv(selectedDirectory.value.id, file, mapping, options)
+    showImportCsvModal.value = false
+    toastSuccess(`Импортировано ${result.created} записей`)
+  } catch (err: any) {
+    toastError(err.message || 'Не удалось импортировать файл')
+  }
+}
+
+const handleExportCsv = async () => {
+  if (!directoriesComposable.value || !selectedDirectory.value) return
+  try {
+    await directoriesComposable.value.exportCsv(selectedDirectory.value.id)
+  } catch (err: any) {
+    toastError(err.message || 'Не удалось экспортировать справочник')
+  }
+}
+
+const handleSaveDirectorySettings = async (data: any) => {
+  if (!directoriesComposable.value || !data.id) return
+  try {
+    await directoriesComposable.value.updateDirectory(data.id, data)
+    showDirectorySettingsSheet.value = false
+    toastSuccess('Настройки сохранены')
+  } catch (err: any) {
+    directorySettingsSheetRef.value?.setError(err.message || 'Не удалось сохранить настройки')
+    toastError(err.message || 'Не удалось сохранить настройки')
+  } finally {
+    directorySettingsSheetRef.value?.setSaving(false)
+  }
+}
+
+const handleDeleteDirectoryFromSettings = async (id: string) => {
+  if (!directoriesComposable.value) return
+  try {
+    await directoriesComposable.value.deleteDirectory(id)
+    showDirectorySettingsSheet.value = false
+    toastSuccess('Справочник удалён')
+  } catch (err: any) {
+    directorySettingsSheetRef.value?.setError(err.message || 'Не удалось удалить справочник')
+    toastError(err.message || 'Не удалось удалить справочник')
+  } finally {
+    directorySettingsSheetRef.value?.setDeleting(false)
+  }
+}
+</script>

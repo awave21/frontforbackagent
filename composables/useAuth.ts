@@ -57,10 +57,18 @@ export type ApiError = {
   retry_after?: number
 }
 
-// Функция для парсинга ошибок API
+  // Функция для парсинга ошибок API
 const parseApiError = (err: any): ApiError => {
   // Проверяем статус код для определения типа ошибки
   const status = err?.status || err?.statusCode || err?.response?.status || 0
+  
+  // Обработка 403 (Forbidden) - недостаточно прав
+  if (status === 403) {
+    return {
+      error: 'forbidden',
+      message: 'Недостаточно прав. У вас нет доступа к выполнению этого действия.'
+    }
+  }
   
   // Обработка сетевых ошибок и ошибок шлюза
   if (status === 502) {
@@ -253,6 +261,11 @@ export const useAuth = () => {
         })
       }
 
+      // После успешной регистрации обновляем данные через /auth/me для актуализации role и scopes
+      if (response.token) {
+        await fetchCurrentUser()
+      }
+
       return response
     } catch (err: any) {
       const apiError = parseApiError(err)
@@ -336,6 +349,11 @@ export const useAuth = () => {
         })
       }
 
+      // После успешного входа обновляем данные через /auth/me для актуализации role и scopes
+      if (response.token) {
+        await fetchCurrentUser()
+      }
+
       return response
     } catch (err: any) {
       const apiError = parseApiError(err)
@@ -413,6 +431,56 @@ export const useAuth = () => {
       throw err
     } finally {
       isLoading.value = false
+    }
+  }
+
+  // Получение текущего пользователя через /auth/me
+  const fetchCurrentUser = async () => {
+    if (!token.value && process.client) {
+      const savedToken = localStorage.getItem('auth_token')
+      if (!savedToken || !isTokenValid(savedToken)) {
+        return null
+      }
+      token.value = savedToken
+    }
+
+    if (!token.value) {
+      return null
+    }
+
+    try {
+      const response = await apiFetch<{
+        user: User
+        tenant: Tenant
+      }>('/auth/me', {
+        method: 'GET'
+      })
+
+      // Обновляем данные пользователя и организации
+      if (response.user) {
+        const parsedUserData = {
+          ...response.user,
+          scopes: Array.isArray(response.user.scopes) ? response.user.scopes : []
+        }
+        user.value = parsedUserData
+        if (process.client) {
+          localStorage.setItem('auth_user', JSON.stringify(parsedUserData))
+        }
+      }
+
+      if (response.tenant) {
+        tenant.value = response.tenant
+        if (process.client) {
+          localStorage.setItem('auth_tenant', JSON.stringify(response.tenant))
+        }
+      }
+
+      return response
+    } catch (err: any) {
+      const apiError = parseApiError(err)
+      console.error('Failed to fetch current user:', apiError)
+      // Не выбрасываем ошибку, чтобы не ломать инициализацию
+      return null
     }
   }
 
@@ -683,6 +751,11 @@ export const useAuth = () => {
         console.error('Failed to parse saved tenant data', e)
       }
     }
+
+    // Если есть валидный токен, обновляем данные пользователя через /auth/me
+    if (token.value && isTokenValid(token.value)) {
+      await fetchCurrentUser()
+    }
   }
 
   // Выполняется при монтировании composable
@@ -702,6 +775,7 @@ export const useAuth = () => {
     loginWithApiKey,
     refreshAccessToken,
     logout,
+    fetchCurrentUser,
     isAuthenticated: computed(() => {
       if (!token.value) return false
       // Проверяем валидность токена при каждом обращении

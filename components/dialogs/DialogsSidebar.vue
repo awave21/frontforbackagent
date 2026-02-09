@@ -87,18 +87,6 @@
       </div>
     </div>
 
-    <!-- New Dialog Button -->
-    <div class="px-4 pb-3">
-      <button
-        @click="$emit('create-dialog')"
-        :disabled="!selectedAgentId"
-        class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl text-sm font-semibold transition-colors"
-      >
-        <Plus class="w-4 h-4" />
-        Новый диалог
-      </button>
-    </div>
-
     <!-- Dialogs List -->
     <div class="flex-1 overflow-y-auto">
       <div v-if="isLoading || isDialogsLoading" class="flex items-center justify-center py-8">
@@ -119,37 +107,33 @@
         </button>
       </div>
 
-      <div v-else class="divide-y divide-slate-100">
+      <TransitionGroup
+        v-else
+        tag="div"
+        class="divide-y divide-slate-100"
+        name="dialog-list"
+      >
         <DialogItem
           v-for="dialog in filteredDialogs"
           :key="dialog.id"
           :dialog="dialog"
           :is-selected="dialog.id === selectedDialogId"
-          :agent-enabled="isAgentEnabled"
           @click="$emit('select-dialog', dialog.id)"
           @rename="handleRenameDialog"
           @delete="handleDeleteDialog"
         />
-      </div>
+      </TransitionGroup>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { onClickOutside } from '@vueuse/core'
-import { ChevronDown, Search, Plus, Check, Loader2, MessageSquare } from 'lucide-vue-next'
+import { ChevronDown, Search, Check, Loader2, MessageSquare } from 'lucide-vue-next'
 import { useDialogs } from '../../composables/useDialogs'
-import { useAgentEnabled } from '../../composables/useAgentEnabled'
 import DialogItem from './DialogItem.vue'
 import type { Agent } from '../../composables/useAgents'
-
-// Debug on mount
-onMounted(() => {
-  console.log('=== [DialogsSidebar] MOUNTED === BUILD v2')
-  console.log('[DialogsSidebar] Initial dialogs:', dialogs.value)
-  console.log('[DialogsSidebar] dialogs ref:', dialogs)
-})
 
 const props = defineProps<{
   agents: readonly Agent[]
@@ -166,7 +150,6 @@ const emit = defineEmits<{
 
 // Dialogs composable
 const { dialogs, isLoading: isDialogsLoading, updateDialog, deleteDialog } = useDialogs()
-const { isAgentEnabled: checkAgentEnabled } = useAgentEnabled()
 
 // Agent dropdown
 const dropdownRef = ref<HTMLElement | null>(null)
@@ -193,11 +176,6 @@ const selectedAgentInitials = computed(() => {
   return getAgentInitials(selectedAgent.value?.name || '')
 })
 
-const isAgentEnabled = computed(() => {
-  if (!props.selectedAgentId) return true
-  return checkAgentEnabled(props.selectedAgentId)
-})
-
 const agentsCountLabel = computed(() => {
   const count = props.agents.length
   if (count === 1) return 'агент'
@@ -206,12 +184,7 @@ const agentsCountLabel = computed(() => {
 })
 
 const filteredDialogs = computed(() => {
-  console.log('[DialogsSidebar] dialogs.value:', dialogs.value)
-  console.log('[DialogsSidebar] dialogs.value.length:', dialogs.value.length)
-  
-  if (!searchQuery.value.trim()) {
-    return dialogs.value
-  }
+  if (!searchQuery.value.trim()) return dialogs.value
   
   const query = searchQuery.value.toLowerCase()
   return dialogs.value.filter(dialog => {
@@ -251,10 +224,28 @@ const handleDeleteDialog = async (dialogId: string) => {
 watch(() => props.selectedAgentId, () => {
   searchQuery.value = ''
 })
-
-// Debug: watch dialogs changes
-watch(dialogs, (newDialogs) => {
-  console.log('[DialogsSidebar] dialogs changed:', newDialogs)
-  console.log('[DialogsSidebar] dialogs.length:', newDialogs.length)
-}, { immediate: true, deep: true })
 </script>
+
+<style scoped>
+/* Smooth reorder when dialog moves to top */
+.dialog-list-move {
+  transition: transform 0.25s ease;
+}
+/* New dialog appearing */
+.dialog-list-enter-active {
+  transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+}
+.dialog-list-enter-from {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+/* Dialog removed */
+.dialog-list-leave-active {
+  transition: opacity 0.15s ease-in;
+  position: absolute;
+  width: 100%;
+}
+.dialog-list-leave-to {
+  opacity: 0;
+}
+</style>

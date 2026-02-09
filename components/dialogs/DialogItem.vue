@@ -16,12 +16,24 @@
       <div
         class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
         :class="[
-          isSelected
-            ? 'bg-indigo-100'
-            : 'bg-slate-100'
+          isTelegram
+            ? (isSelected ? 'bg-blue-100' : 'bg-blue-50')
+            : (isSelected ? 'bg-indigo-100' : 'bg-slate-100')
         ]"
       >
+        <!-- Telegram Icon -->
+        <svg
+          v-if="isTelegram"
+          class="w-5 h-5"
+          :class="[isSelected ? 'text-blue-600' : 'text-blue-500']"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+        >
+          <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+        </svg>
+        <!-- Default Icon -->
         <MessageSquare
+          v-else
           class="w-5 h-5"
           :class="[
             isSelected ? 'text-indigo-600' : 'text-slate-500'
@@ -41,6 +53,14 @@
             {{ dialogTitle }}
           </h3>
           
+          <!-- Platform Badge -->
+          <span
+            v-if="isTelegram"
+            class="px-1.5 py-0.5 text-[10px] font-medium rounded bg-blue-100 text-blue-700"
+          >
+            TG
+          </span>
+          
           <!-- Status Indicator -->
           <StatusIndicator
             v-if="displayStatus"
@@ -49,15 +69,42 @@
           />
         </div>
         
+        <!-- Username -->
+        <p
+          v-if="username"
+          class="text-xs text-blue-500 truncate"
+        >
+          @{{ username }}
+        </p>
+        
         <p class="text-xs text-slate-500 truncate mt-0.5">
           {{ dialog.last_message_preview || 'Нет сообщений' }}
         </p>
       </div>
 
-      <!-- Time -->
-      <span class="text-xs text-slate-400 flex-shrink-0">
-        {{ formattedTime }}
-      </span>
+      <!-- Right Column -->
+      <div class="flex flex-col items-end gap-1 flex-shrink-0">
+        <!-- Time -->
+        <span class="text-xs text-slate-400">
+          {{ formattedTime }}
+        </span>
+        
+        <!-- Agent Status Badge (per-dialog) -->
+        <span
+          v-if="isDialogAgentActive"
+          class="px-1.5 py-0.5 text-[10px] font-medium rounded bg-green-100 text-green-700 flex items-center gap-0.5"
+        >
+          <span class="w-1.5 h-1.5 bg-green-500 rounded-full" />
+          Агент
+        </span>
+        <span
+          v-else
+          class="px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-100 text-amber-700 flex items-center gap-0.5"
+        >
+          <PauseCircle class="w-3 h-3" />
+          Пауза
+        </span>
+      </div>
     </button>
 
     <!-- Context Menu Trigger (mobile long press fallback) -->
@@ -177,13 +224,12 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch } from 'vue'
 import { onClickOutside } from '@vueuse/core'
-import { MessageSquare, MoreVertical, Pencil, Trash2 } from 'lucide-vue-next'
+import { MessageSquare, MoreVertical, Pencil, Trash2, PauseCircle } from 'lucide-vue-next'
 import type { Dialog, DialogStatus } from '../../types/dialogs'
 
 const props = defineProps<{
   dialog: Dialog
   isSelected: boolean
-  agentEnabled: boolean
 }>()
 
 const emit = defineEmits<{
@@ -211,8 +257,27 @@ onClickOutside(contextMenuRef, () => {
 })
 
 // Computed
+const isTelegram = computed(() => {
+  return props.dialog.platform === 'telegram' || props.dialog.id?.startsWith('telegram:')
+})
+
+const username = computed(() => {
+  return props.dialog.user_info?.username || null
+})
+
 const dialogTitle = computed(() => {
-  return props.dialog.title || 'Диалог'
+  // Prioritize user_info over title (title often contains message preview)
+  const userInfo = props.dialog.user_info
+  if (userInfo?.first_name || userInfo?.last_name) {
+    return [userInfo.first_name, userInfo.last_name].filter(Boolean).join(' ')
+  }
+  if (userInfo?.username) return `@${userInfo.username}`
+  // For Telegram dialogs without user_info, show Telegram ID
+  if (isTelegram.value && props.dialog.id) {
+    const telegramId = props.dialog.id.replace('telegram:', '')
+    return `Telegram #${telegramId}`
+  }
+  return 'Диалог'
 })
 
 const formattedTime = computed(() => {
@@ -234,12 +299,15 @@ const formattedTime = computed(() => {
   }
 })
 
+// Per-dialog agent active state
+const isDialogAgentActive = computed(() => (props.dialog.agent_status ?? 'active') === 'active')
+
 // Determine which status indicator to show (priority: IN_PROGRESS > ERROR > UNREAD > NEW)
 const displayStatus = computed((): DialogStatus | null => {
   const status = props.dialog.status
   
-  // Don't show IN_PROGRESS if agent is disabled
-  if (status === 'IN_PROGRESS' && !props.agentEnabled) {
+  // Don't show IN_PROGRESS if agent is paused for this dialog
+  if (status === 'IN_PROGRESS' && !isDialogAgentActive.value) {
     // Fall through to next priority
     if (props.dialog.unread_count > 0) return 'UNREAD'
     return null

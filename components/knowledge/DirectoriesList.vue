@@ -97,23 +97,7 @@
 import { ref, computed } from 'vue'
 import { Plus, Search, Loader2, BookOpen, AlertCircle } from 'lucide-vue-next'
 import DirectoryCard from './DirectoryCard.vue'
-
-type Directory = {
-  id: string
-  agent_id?: string
-  name: string
-  slug?: string
-  tool_name: string
-  tool_description?: string
-  template: string
-  columns: { name: string; label: string; type: string; required: boolean; searchable?: boolean }[]
-  response_mode?: 'function_result' | 'direct_message'
-  search_type?: 'exact' | 'fuzzy' | 'semantic'
-  items_count: number
-  is_enabled: boolean
-  created_at?: string
-  updated_at?: string
-}
+import type { Directory } from '~/types/directories'
 
 const props = defineProps<{
   directories: Directory[]

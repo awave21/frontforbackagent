@@ -47,7 +47,8 @@ export type WsMessageCreatedEvent = {
   type: 'message_created'
   data: {
     id: string
-    session_id: string
+    session_id?: string
+    dialog_id?: string
     agent_id: string
     role: string
     content: string

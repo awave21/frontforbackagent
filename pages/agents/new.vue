@@ -144,9 +144,23 @@
                     class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
                   >
                     <option value="">Выберите модель</option>
-                    <option value="openai:gpt-4o-mini">GPT-4o Mini</option>
-                    <option value="openai:gpt-4o">GPT-4o</option>
-                    <option value="anthropic:claude-3-haiku">Claude 3 Haiku</option>
+                    <optgroup label="GPT-5 (Рекомендуемые - 2026)">
+                      <option value="openai:gpt-5.2">GPT-5.2 (Лучшая)</option>
+                      <option value="openai:gpt-5-mini">GPT-5 Mini (Быстрая)</option>
+                      <option value="openai:gpt-5-nano">GPT-5 Nano (Экономная)</option>
+                    </optgroup>
+                    <optgroup label="GPT-4.1">
+                      <option value="openai:gpt-4.1">GPT-4.1 (Умная)</option>
+                      <option value="openai:gpt-4.1-mini">GPT-4.1 Mini (Быстрая)</option>
+                    </optgroup>
+                    <optgroup label="GPT-4o (Легаси)">
+                      <option value="openai:gpt-4o">GPT-4o (Мультимодальная)</option>
+                      <option value="openai:gpt-4o-mini">GPT-4o Mini (Быстрая)</option>
+                    </optgroup>
+                    <optgroup label="Reasoning">
+                      <option value="openai:o3">o3 (Сложные задачи)</option>
+                      <option value="openai:o4-mini">o4 Mini (Быстрые рассуждения)</option>
+                    </optgroup>
                   </select>
                 </div>
               </div>
@@ -217,7 +231,7 @@ const creating = ref(false)
 
 const form = ref({
   name: '',
-  model: 'openai:gpt-4o-mini',
+  model: 'openai:gpt-5-mini',
   system_prompt: ''
 })
 

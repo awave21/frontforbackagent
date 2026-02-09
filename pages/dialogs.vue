@@ -1,16 +1,12 @@
 <template>
   <div class="min-h-screen bg-slate-50">
-    <!-- Mobile Header -->
-    <div class="lg:hidden bg-white border-b border-slate-200 px-4 py-3">
+    <!-- Mobile Header (only show when dialog list is visible) -->
+    <div
+      v-if="showMobileList || !selectedDialogId"
+      class="lg:hidden bg-white border-b border-slate-200 px-4 py-3"
+    >
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <button
-            v-if="selectedDialogId && !showMobileList"
-            @click="showMobileList = true"
-            class="p-2 -ml-2 rounded-lg text-slate-600 hover:bg-slate-100"
-          >
-            <ArrowLeft class="h-5 w-5" />
-          </button>
           <div
             class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center"
           >
@@ -81,6 +77,7 @@
         >
           <ChatArea
             v-if="selectedDialogId && selectedAgent"
+            :key="selectedDialogId"
             :dialog-id="selectedDialogId"
             :agent="selectedAgent"
             :ws-send-message="wsSendMessage"
@@ -108,7 +105,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Menu as MenuIcon, ArrowLeft } from 'lucide-vue-next'
+import { Menu as MenuIcon } from 'lucide-vue-next'
 import { useAgents } from '../composables/useAgents'
 import { useDialogs } from '../composables/useDialogs'
 import { useAuth } from '../composables/useAuth'
@@ -146,6 +143,7 @@ const selectedDialogId = ref<string | null>(route.query.dialogId as string || nu
 
 // Mobile view state (show chat if dialog is preselected)
 const showMobileList = ref(!selectedDialogId.value)
+const joinedDialogId = ref<string | null>(null)
 
 // WebSocket connection (replaces SSE)
 const { 
@@ -164,36 +162,16 @@ const selectedAgent = computed<Agent | undefined>(() => {
 
 // Handlers
 const handleSelectAgent = async (agentId: string) => {
-  console.log('[Page] Selecting agent:', agentId)
   selectedAgentId.value = agentId
   selectedDialogId.value = null
-  
-  // Update URL
   router.push({ query: { ...route.query, agentId, dialogId: undefined } })
-  
   await fetchDialogs(agentId)
 }
 
 const handleSelectDialog = (dialogId: string) => {
-  console.log('[Page] Selecting dialog:', dialogId)
-  console.log('[Page] selectedAgentId:', selectedAgentId.value)
-  console.log('[Page] selectedAgent:', selectedAgent.value)
-  
-  // Leave previous dialog and join new one (optional filtering)
-  if (selectedDialogId.value && selectedDialogId.value !== dialogId) {
-    leaveDialog(selectedDialogId.value)
-  }
-  
   selectedDialogId.value = dialogId
   showMobileList.value = false
-  
-  // Join the new dialog for filtered events
-  joinDialog(dialogId)
-  
-  // Update URL
   router.push({ query: { ...route.query, dialogId } })
-  
-  console.log('[Page] After selection - dialogId:', selectedDialogId.value, 'agent:', selectedAgent.value?.id)
 }
 
 // Keep selected IDs in sync with URL query changes
@@ -205,6 +183,28 @@ watch(() => route.query.dialogId, (dialogId) => {
   selectedDialogId.value = typeof dialogId === 'string' ? dialogId : null
   if (selectedDialogId.value) showMobileList.value = false
 })
+
+// Sync WebSocket dialog subscription with current state
+watch([isConnected, selectedDialogId], ([connected, dialogId]) => {
+  if (!connected) {
+    joinedDialogId.value = null
+    return
+  }
+
+  if (joinedDialogId.value && joinedDialogId.value !== dialogId) {
+    leaveDialog(joinedDialogId.value)
+    joinedDialogId.value = null
+  }
+
+  if (dialogId && joinedDialogId.value !== dialogId) {
+    const joined = joinDialog(dialogId)
+    if (joined) {
+      joinedDialogId.value = dialogId
+    } else {
+      console.warn('[Page] Failed to join dialog (WebSocket not ready):', dialogId)
+    }
+  }
+}, { immediate: true })
 
 const handleCreateDialog = async () => {
   if (!selectedAgentId.value) {
@@ -227,46 +227,25 @@ const handleAuthSuccess = () => {
 
 // Load initial data
 const loadInitialData = async () => {
-  console.log('[Page] Loading initial data...')
-  console.log('[Page] Route query:', route.query)
-  console.log('[Page] selectedAgentId from URL:', selectedAgentId.value)
-  console.log('[Page] selectedDialogId from URL:', selectedDialogId.value)
-  
   await fetchAgents()
-  console.log('[Page] Agents loaded:', agents.value.length, agents.value.map(a => a.id))
   
   if (selectedAgentId.value) {
-    console.log('[Page] Agent already selected from URL:', selectedAgentId.value)
-    console.log('[Page] Calling fetchDialogs...')
     await fetchDialogs(selectedAgentId.value)
-    console.log('[Page] fetchDialogs completed')
-    console.log('[Page] selectedAgent after fetch:', selectedAgent.value?.id)
-    console.log('[Page] selectedDialogId:', selectedDialogId.value)
-    console.log('[Page] ChatArea should render:', !!(selectedDialogId.value && selectedAgent.value))
   } else if (agents.value.length > 0) {
-    console.log('[Page] No agent in URL, selecting first one')
     await handleSelectAgent(agents.value[0].id)
-  } else {
-    console.log('[Page] No agents available')
   }
 }
 
 // Watch for auth changes
 watch(isAuthenticated, (authenticated) => {
-  console.log('[Page] Auth state changed:', authenticated)
-  if (authenticated) {
-    loadInitialData()
-  }
+  if (authenticated) loadInitialData()
 })
 
 // Initialize
 onMounted(() => {
-  console.log('[Page] Mounted, isAuthenticated:', isAuthenticated.value)
-  console.log('[Page] BUILD VERSION: 2026-02-04-v2') // Force check new build
   if (isAuthenticated.value) {
     loadInitialData()
   } else {
-    console.log('[Page] Not authenticated, showing modal')
     showAuthModal.value = true
   }
 })

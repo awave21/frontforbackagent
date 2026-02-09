@@ -1,14 +1,14 @@
-import { ref, readonly } from 'vue'
-import type { Message, MessageRole, MessageStatus, MessageType, MessagesListResponse, SendMessageData } from '../types/dialogs'
+import { ref, reactive, readonly } from 'vue'
+import type { Message, MessageRole, MessageStatus, MessageType, MessagesListResponse, SendMessageData, SendManagerMessageData } from '../types/dialogs'
 import { useApiFetch } from './useApiFetch'
 import { useDialogs } from './useDialogs'
 
-// State per dialog - using ref with plain object for reliable reactivity
-const messagesMap = ref<Record<string, Message[]>>({})
+// State per dialog - using reactive for better dynamic key tracking
+const messagesMap = reactive<Record<string, Message[]>>({})
 
-// Helper to update messages - creates new reference to trigger reactivity
+// Helper to update messages
 const setMessages = (dialogId: string, messages: Message[]) => {
-  messagesMap.value = { ...messagesMap.value, [dialogId]: messages }
+  messagesMap[dialogId] = [...messages]
 }
 const isLoading = ref(false)
 const isSending = ref(false)
@@ -30,6 +30,7 @@ const normalizeRole = (
   if (typeof rawRole === 'string') {
     const value = rawRole.toLowerCase()
     if (['user', 'human', 'client', 'customer', 'visitor', 'requester'].includes(value)) return 'user'
+    if (['manager', 'operator', 'admin', 'support'].includes(value)) return 'manager'
     if (['agent', 'assistant', 'bot', 'ai', 'system'].includes(value)) return 'agent'
   }
 
@@ -56,10 +57,76 @@ const normalizeStatus = (rawStatus: unknown): MessageStatus => {
   return 'sent'
 }
 
-const normalizeMessage = (raw: any, fallbackDialogId: string): Message => {
+// Roles that indicate internal/tool messages (should not be displayed in chat)
+const INTERNAL_ROLES = new Set([
+  'tool', 'function', 'tool_result', 'function_result',
+  'tool_call', 'function_call', 'tool_use'
+])
+
+// Message types that indicate internal/tool usage
+const INTERNAL_TYPES = new Set([
+  'tool_result', 'tool_call', 'function_call', 'function_result', 'tool_use'
+])
+
+/**
+ * Check if string content looks like raw serialized data (JSON or Python dict/list)
+ * that shouldn't be displayed as a human-readable chat message.
+ */
+const looksLikeRawData = (text: string): boolean => {
+  const trimmed = text.trim()
+  if (trimmed.length < 20) return false
+
+  // Entire message must look like a data structure
+  const isWrapped =
+    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+    (trimmed.startsWith('[') && trimmed.endsWith(']'))
+  if (!isWrapped) return false
+
+  // Try JSON parse
+  try {
+    const parsed = JSON.parse(trimmed)
+    if (typeof parsed === 'object' && parsed !== null) return true
+  } catch {
+    // Not JSON — check for Python-style dict: {'key': value, ...}
+    if (/^\{\s*'[^']+'\s*:/.test(trimmed)) return true
+  }
+
+  return false
+}
+
+const normalizeMessage = (raw: any, fallbackDialogId: string): Message | null => {
+  // --- Filter out internal / tool messages ---
+
+  // 1) Skip by role (tool, function, etc.)
+  const rawRoleValue = raw?.role ?? raw?.sender ?? raw?.author ?? raw?.from ?? raw?.direction
+  if (typeof rawRoleValue === 'string' && INTERNAL_ROLES.has(rawRoleValue.toLowerCase())) {
+    return null
+  }
+
+  // 2) Skip by message type (tool_result, function_call, etc.)
+  const rawMsgType = raw?.type ?? raw?.message_type ?? raw?.content_type ?? raw?.kind
+  if (typeof rawMsgType === 'string' && INTERNAL_TYPES.has(rawMsgType.toLowerCase())) {
+    return null
+  }
+
+  // 3) Extract content early to check for raw data objects
+  const contentValue = raw?.content ?? raw?.text ?? raw?.message ?? raw?.body ?? raw?.payload ?? raw?.data?.content ?? ''
+
+  // Skip when content is a raw object (not string) — likely tool/API response
+  if (typeof contentValue === 'object' && contentValue !== null) {
+    return null
+  }
+
+  const content = typeof contentValue === 'string' ? contentValue : String(contentValue)
+
+  // 4) Skip when content looks like serialized data (JSON / Python dict)
+  if (looksLikeRawData(content)) {
+    return null
+  }
+
+  // --- Normal message normalization ---
   const dialogId = raw?.dialog_id ?? raw?.dialogId ?? raw?.session_id ?? raw?.sessionId ?? fallbackDialogId
   const id = raw?.id ?? raw?.message_id ?? raw?.messageId ?? raw?.uuid ?? raw?._id ?? `${dialogId}-${raw?.created_at ?? raw?.createdAt ?? Date.now()}`
-  const rawRoleValue = raw?.role ?? raw?.sender ?? raw?.author ?? raw?.from ?? raw?.actor ?? raw?.direction
   const role = normalizeRole(rawRoleValue, {
     isUser: raw?.isUser,
     is_user: raw?.is_user,
@@ -67,8 +134,6 @@ const normalizeMessage = (raw: any, fallbackDialogId: string): Message => {
     is_agent: raw?.is_agent
   })
   const type = normalizeType(raw?.type ?? raw?.message_type ?? raw?.content_type ?? raw?.kind ?? raw?.media_type)
-  const contentValue = raw?.content ?? raw?.text ?? raw?.message ?? raw?.body ?? raw?.payload ?? raw?.data?.content ?? ''
-  const content = typeof contentValue === 'string' ? contentValue : JSON.stringify(contentValue)
   const createdAt = raw?.created_at ?? raw?.createdAt ?? raw?.timestamp ?? raw?.time ?? raw?.created ?? new Date().toISOString()
   const status = normalizeStatus(raw?.status)
   const durationSeconds = raw?.duration_seconds ?? raw?.durationSeconds ?? raw?.duration
@@ -83,7 +148,7 @@ const normalizeMessage = (raw: any, fallbackDialogId: string): Message => {
     dialog_id: String(dialogId),
     role,
     type,
-    content: String(content),
+    content,
     status,
     duration_seconds: durationValue,
     created_at: String(createdAt)
@@ -92,15 +157,13 @@ const normalizeMessage = (raw: any, fallbackDialogId: string): Message => {
 
 export const useMessages = () => {
   const apiFetch = useApiFetch()
-  const { updateDialogStatus, updateLastMessage, incrementUnread } = useDialogs()
+  const { dialogs, updateDialogStatus, updateLastMessage, incrementUnread, resolveDialogId } = useDialogs()
 
   /**
    * Get messages for a dialog
    */
   const getMessages = (dialogId: string): Message[] => {
-    const msgs = messagesMap.value[dialogId] || []
-    console.log(`[useMessages] getMessages(${dialogId}):`, msgs.length, 'messages')
-    return msgs
+    return messagesMap[dialogId] || []
   }
 
   /**
@@ -126,55 +189,41 @@ export const useMessages = () => {
       const encodedDialogId = encodeURIComponent(dialogId)
       const url = `agents/${agentId}/dialogs/${encodedDialogId}/messages${queryString ? `?${queryString}` : ''}`
 
-      console.log(`[useMessages] Fetching history from: ${url}`)
-      console.log(`[useMessages] Original dialogId: ${dialogId}, encoded: ${encodedDialogId}`)
-
       const response = await apiFetch<MessagesListResponse | Message[]>(url, {
         method: 'GET'
       })
       
-      console.log(`[useMessages] Raw response:`, response)
-      console.log(`[useMessages] Response type:`, Array.isArray(response) ? 'array' : typeof response)
-      
       // Handle both response formats: {messages: [...], has_more: bool} or direct array [...]
-      let messagesList: Message[] = []
+      let rawMessages: any[] = []
       
       if (Array.isArray(response)) {
-        messagesList = response
-        responseHasMore = false // If array, assume no pagination info
+        rawMessages = response
+        responseHasMore = false
       } else if (response && typeof response === 'object' && 'messages' in response) {
-        messagesList = response.messages || []
+        rawMessages = response.messages || []
         responseHasMore = response.has_more || false
       } else if (response && typeof response === 'object' && 'items' in response) {
-        messagesList = (response as any).items || []
+        rawMessages = (response as any).items || []
         responseHasMore = (response as any).has_more || false
       } else if (response && typeof response === 'object' && 'data' in response) {
-        messagesList = (response as any).data || []
+        rawMessages = (response as any).data || []
         responseHasMore = (response as any).has_more || false
       } else {
         console.error('[useMessages] Unexpected response format:', response)
       }
 
-      const normalizedMessages = messagesList.map(message => normalizeMessage(message, dialogId))
-      messagesList = normalizedMessages
-      
-      console.log(`[useMessages] Received ${messagesList.length} messages`, {
-        hasMore: responseHasMore,
-        dialogId
-      })
-      
-      const existingMessages = messagesMap.value[dialogId] || []
+      // Normalize messages
+      const messagesList = rawMessages
+        .map(message => normalizeMessage(message, dialogId))
+        .filter((msg): msg is Message => msg !== null)
+      const existingMessages = messagesMap[dialogId] || []
       
       if (options?.before) {
-        // Prepend older messages (infinite scroll up)
         setMessages(dialogId, [...messagesList, ...existingMessages])
       } else {
-        // Initial load
         setMessages(dialogId, messagesList)
       }
-      
-      console.log(`[useMessages] Messages set for ${dialogId}:`, messagesMap.value[dialogId]?.length)
-      
+
       hasMore.value.set(dialogId, responseHasMore)
     } catch (err: any) {
       const msg = err?.data?.detail ?? err?.data?.message ?? err?.message ?? 'Не удалось загрузить сообщения'
@@ -212,39 +261,43 @@ export const useMessages = () => {
     }
 
     // Add to messages immediately
-    const messages = messagesMap.value[dialogId] || []
+    const messages = messagesMap[dialogId] || []
     setMessages(dialogId, [...messages, optimisticMessage])
 
     try {
       const body: SendMessageData = { content: content.trim(), type }
       
-      const response = await apiFetch<Message>(`agents/${agentId}/dialogs/${dialogId}/messages`, {
+      const encodedDialogId = encodeURIComponent(dialogId)
+      const response = await apiFetch<Message>(`agents/${agentId}/dialogs/${encodedDialogId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body
       })
 
-      // Replace optimistic message with real one
-      const currentMessages = messagesMap.value[dialogId] || []
+      // Keep temp ID stable — only update status to avoid TransitionGroup key change (prevents UI flicker)
+      const currentMessages = messagesMap[dialogId] || []
       const index = currentMessages.findIndex(m => m.id === tempId)
       if (index !== -1) {
         const updatedMessages = [...currentMessages]
-        updatedMessages[index] = { ...response, status: 'sent' }
+        updatedMessages[index] = { ...updatedMessages[index], status: 'sent' }
         setMessages(dialogId, updatedMessages)
       }
 
       // Update dialog preview
-      updateLastMessage(dialogId, content.trim().slice(0, 100), response.created_at)
+      updateLastMessage(dialogId, content.trim().slice(0, 100), response.created_at || new Date().toISOString())
 
       // If agent is enabled, start streaming response
       if (agentEnabled) {
-        await startAgentStream(agentId, dialogId, response.id)
+        const realId = response?.id || (response as any)?.message_id
+        if (realId) {
+          await startAgentStream(agentId, dialogId, realId)
+        }
       }
 
       return response
     } catch (err: any) {
       // Mark message as failed
-      const currentMessages = messagesMap.value[dialogId] || []
+      const currentMessages = messagesMap[dialogId] || []
       const index = currentMessages.findIndex(m => m.id === tempId)
       if (index !== -1) {
         const updatedMessages = [...currentMessages]
@@ -268,16 +321,93 @@ export const useMessages = () => {
    * Retry failed message
    */
   const retryMessage = async (agentId: string, dialogId: string, messageId: string, agentEnabled: boolean = true) => {
-    const messages = messagesMap.value[dialogId] || []
+    const messages = messagesMap[dialogId] || []
     const message = messages.find(m => m.id === messageId)
     
     if (!message || message.status !== 'failed') return
-
+    
     // Remove failed message
     setMessages(dialogId, messages.filter(m => m.id !== messageId))
-
+    
     // Resend
     await sendMessage(agentId, dialogId, message.content, message.type, agentEnabled)
+  }
+
+  /**
+   * Send a manager (operator) message in a dialog
+   * POST /agents/{agent_id}/dialogs/{dialog_id}/manager-message
+   */
+  const sendManagerMessage = async (
+    agentId: string,
+    dialogId: string,
+    content: string
+  ): Promise<Message | null> => {
+    if (!agentId || !dialogId || !content.trim()) return null
+
+    isSending.value = true
+    error.value = null
+
+    // Create optimistic message with 'manager' role
+    const tempId = `temp-mgr-${Date.now()}`
+    const optimisticMessage: Message = {
+      id: tempId,
+      dialog_id: dialogId,
+      role: 'manager',
+      type: 'text',
+      content: content.trim(),
+      status: 'sending',
+      created_at: new Date().toISOString()
+    }
+
+    // Add to messages immediately
+    const messages = messagesMap[dialogId] || []
+    setMessages(dialogId, [...messages, optimisticMessage])
+
+    try {
+      const body: SendManagerMessageData = { content: content.trim() }
+      const encodedDialogId = encodeURIComponent(dialogId)
+
+      await apiFetch<Message>(
+        `agents/${agentId}/dialogs/${encodedDialogId}/manager-message`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body
+        }
+      )
+
+      // Keep temp ID stable — only update status to avoid TransitionGroup key change (prevents UI flicker)
+      const currentMessages = messagesMap[dialogId] || []
+      const index = currentMessages.findIndex(m => m.id === tempId)
+      if (index !== -1) {
+        const updatedMessages = [...currentMessages]
+        updatedMessages[index] = { ...updatedMessages[index], status: 'sent' }
+        setMessages(dialogId, updatedMessages)
+      }
+
+      updateLastMessage(dialogId, content.trim().slice(0, 100), new Date().toISOString())
+
+      return { ...optimisticMessage, status: 'sent' as MessageStatus }
+    } catch (err: any) {
+      // Mark message as failed
+      const currentMessages = messagesMap[dialogId] || []
+      const index = currentMessages.findIndex(m => m.id === tempId)
+      if (index !== -1) {
+        const updatedMessages = [...currentMessages]
+        updatedMessages[index] = {
+          ...updatedMessages[index],
+          status: 'failed',
+          error_message: err?.message || 'Ошибка отправки'
+        }
+        setMessages(dialogId, updatedMessages)
+      }
+
+      const msg = err?.data?.detail ?? err?.data?.message ?? err?.message ?? 'Не удалось отправить сообщение менеджера'
+      error.value = typeof msg === 'string' ? msg : JSON.stringify(msg)
+      return null
+    } finally {
+      isSending.value = false
+    }
   }
 
   // ===========================================
@@ -304,7 +434,7 @@ export const useMessages = () => {
       created_at: new Date().toISOString()
     }
 
-    const messages = messagesMap.value[dialogId] || []
+    const messages = messagesMap[dialogId] || []
     setMessages(dialogId, [...messages, optimisticMessage])
     isSending.value = true
 
@@ -313,16 +443,16 @@ export const useMessages = () => {
 
   /**
    * Mark optimistic message as sent (when server confirms via WebSocket)
+   * Keeps the temp ID stable to avoid TransitionGroup key change (prevents UI flicker)
    */
-  const markMessageSent = (dialogId: string, tempId: string, realId?: string) => {
-    const messages = messagesMap.value[dialogId] || []
+  const markMessageSent = (dialogId: string, tempId: string, _realId?: string) => {
+    const messages = messagesMap[dialogId] || []
     const index = messages.findIndex(m => m.id === tempId)
     
     if (index !== -1) {
       const updatedMessages = [...messages]
       updatedMessages[index] = {
         ...updatedMessages[index],
-        id: realId || tempId,
         status: 'sent'
       }
       setMessages(dialogId, updatedMessages)
@@ -335,7 +465,7 @@ export const useMessages = () => {
    * Mark optimistic message as failed
    */
   const markMessageFailed = (dialogId: string, tempId: string, errorMessage?: string) => {
-    const messages = messagesMap.value[dialogId] || []
+    const messages = messagesMap[dialogId] || []
     const index = messages.findIndex(m => m.id === tempId)
     
     if (index !== -1) {
@@ -371,7 +501,7 @@ export const useMessages = () => {
       created_at: new Date().toISOString()
     }
 
-    const messages = messagesMap.value[dialogId] || []
+    const messages = messagesMap[dialogId] || []
     setMessages(dialogId, [...messages, agentMessage])
   }
 
@@ -382,7 +512,7 @@ export const useMessages = () => {
   const handleRunResult = (runId: string, dialogId: string, output: string) => {
     const agentMessageId = `agent-${runId}`
     
-    const messages = messagesMap.value[dialogId] || []
+    const messages = messagesMap[dialogId] || []
     const index = messages.findIndex(m => m.id === agentMessageId)
     
     if (index !== -1) {
@@ -405,7 +535,7 @@ export const useMessages = () => {
   const handleRunError = (runId: string, dialogId: string, errorMsg: string) => {
     const agentMessageId = `agent-${runId}`
     
-    const messages = messagesMap.value[dialogId] || []
+    const messages = messagesMap[dialogId] || []
     const index = messages.findIndex(m => m.id === agentMessageId)
     
     if (index !== -1) {
@@ -446,14 +576,15 @@ export const useMessages = () => {
       created_at: new Date().toISOString()
     }
 
-    const messages = messagesMap.value[dialogId] || []
+    const messages = messagesMap[dialogId] || []
     setMessages(dialogId, [...messages, agentMessage])
 
     try {
       // Get auth token
       const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
       
-      const response = await fetch(`/api/v1/agents/${agentId}/dialogs/${dialogId}/messages/stream`, {
+      const encodedDialogId = encodeURIComponent(dialogId)
+      const response = await fetch(`/api/v1/agents/${agentId}/dialogs/${encodedDialogId}/messages/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -491,7 +622,7 @@ export const useMessages = () => {
               
               if (event.type === 'delta' && event.data?.content) {
                 // Update streaming message content
-                const currentMessages = messagesMap.value[dialogId] || []
+                const currentMessages = messagesMap[dialogId] || []
                 const index = currentMessages.findIndex(m => m.id === agentMessageId)
                 if (index !== -1) {
                   const updatedMessages = [...currentMessages]
@@ -503,7 +634,7 @@ export const useMessages = () => {
                 }
               } else if (event.type === 'done') {
                 // Mark as complete
-                const currentMessages = messagesMap.value[dialogId] || []
+                const currentMessages = messagesMap[dialogId] || []
                 const index = currentMessages.findIndex(m => m.id === agentMessageId)
                 if (index !== -1) {
                   const updatedMessages = [...currentMessages]
@@ -525,7 +656,7 @@ export const useMessages = () => {
       }
 
       // Finalize streaming
-      const finalMessages = messagesMap.value[dialogId] || []
+      const finalMessages = messagesMap[dialogId] || []
       const finalIndex = finalMessages.findIndex(m => m.id === agentMessageId || m.status === 'streaming')
       if (finalIndex !== -1 && finalMessages[finalIndex].status === 'streaming') {
         const updatedFinalMessages = [...finalMessages]
@@ -544,7 +675,7 @@ export const useMessages = () => {
       console.error('Stream error:', err)
       
       // Mark agent message as failed/remove it
-      const currentMessages = messagesMap.value[dialogId] || []
+      const currentMessages = messagesMap[dialogId] || []
       const index = currentMessages.findIndex(m => m.id === agentMessageId)
       if (index !== -1) {
         // Remove the failed streaming message
@@ -564,20 +695,22 @@ export const useMessages = () => {
    * Add message locally (for real-time updates)
    */
   const addMessage = (dialogId: string, message: Message) => {
-    const messages = messagesMap.value[dialogId] || []
-    setMessages(dialogId, [...messages, message])
+    const resolvedDialogId = resolveDialogId(dialogId) ?? dialogId
+    const messages = messagesMap[resolvedDialogId] || []
+    setMessages(resolvedDialogId, [...messages, { ...message, dialog_id: resolvedDialogId }])
   }
 
   /**
    * Update message locally
    */
   const updateMessage = (dialogId: string, messageId: string, updates: Partial<Message>) => {
-    const messages = messagesMap.value[dialogId] || []
+    const resolvedDialogId = resolveDialogId(dialogId) ?? dialogId
+    const messages = messagesMap[resolvedDialogId] || []
     const index = messages.findIndex(m => m.id === messageId)
     if (index !== -1) {
       const updatedMessages = [...messages]
       updatedMessages[index] = { ...updatedMessages[index], ...updates }
-      setMessages(dialogId, updatedMessages)
+      setMessages(resolvedDialogId, updatedMessages)
     }
   }
 
@@ -585,9 +718,9 @@ export const useMessages = () => {
    * Clear messages for a dialog
    */
   const clearMessages = (dialogId: string) => {
-    const { [dialogId]: _, ...rest } = messagesMap.value
-    messagesMap.value = rest
-    hasMore.value.delete(dialogId)
+    const resolvedDialogId = resolveDialogId(dialogId) ?? dialogId
+    delete messagesMap[resolvedDialogId]
+    hasMore.value.delete(resolvedDialogId)
   }
 
   /**
@@ -598,22 +731,36 @@ export const useMessages = () => {
   }
 
   /**
-   * Add incoming message from SSE (for real-time updates)
+   * Add incoming message from WebSocket/SSE (for real-time updates)
    */
   const addIncomingMessage = (message: any) => {
-    const dialogId = message?.dialog_id ?? message?.dialogId ?? message?.session_id ?? message?.sessionId
+    const rawDialogId = message?.dialog_id ?? message?.session_id
+    const dialogId = resolveDialogId(rawDialogId)
+
     if (!dialogId) return
 
-    const currentMessages = messagesMap.value[dialogId] || []
-    const normalizedMessage = normalizeMessage(message, dialogId)
-    
-    // Check if message already exists to avoid duplicates
-    if (!currentMessages.find(m => m.id === normalizedMessage.id)) {
-      setMessages(dialogId, [...currentMessages, normalizedMessage])
-      
-      // Update dialog preview in the list
-      updateLastMessage(dialogId, normalizedMessage.content.slice(0, 100), normalizedMessage.created_at)
-    }
+    const currentMessages = messagesMap[dialogId] || []
+    const normalizedMessage = normalizeMessage({ ...message, dialog_id: dialogId }, dialogId)
+
+    // Skip internal/tool messages (normalizeMessage returns null for those)
+    if (!normalizedMessage) return
+
+    // Avoid duplicates by ID
+    if (currentMessages.some(m => m.id === normalizedMessage.id)) return
+
+    // Avoid duplicates by content+role for recent messages
+    // (handles temp ID vs real ID mismatch from optimistic updates)
+    const now = Date.now()
+    const isDuplicateByContent = currentMessages.some(m =>
+      m.role === normalizedMessage.role &&
+      m.content.trim() === normalizedMessage.content.trim() &&
+      m.status !== 'failed' &&
+      now - new Date(m.created_at).getTime() < 15_000
+    )
+    if (isDuplicateByContent) return
+
+    setMessages(dialogId, [...currentMessages, normalizedMessage])
+    updateLastMessage(dialogId, normalizedMessage.content.slice(0, 100), normalizedMessage.created_at)
   }
 
   return {
@@ -632,6 +779,7 @@ export const useMessages = () => {
     // Actions
     fetchMessages,
     sendMessage,
+    sendManagerMessage,
     retryMessage,
     addMessage,
     addIncomingMessage,

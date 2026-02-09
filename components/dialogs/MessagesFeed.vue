@@ -28,7 +28,13 @@
     </div>
 
     <!-- Messages -->
-    <div v-else class="space-y-4">
+    <TransitionGroup
+      v-else
+      tag="div"
+      class="space-y-4"
+      :name="animateMessages ? 'msg' : ''"
+      :css="animateMessages"
+    >
       <MessageBubble
         v-for="message in messages"
         :key="message.id"
@@ -36,7 +42,7 @@
         @retry="$emit('retry', message.id)"
         @image-click="openLightbox"
       />
-    </div>
+    </TransitionGroup>
 
     <!-- Streaming indicator -->
     <div v-if="isStreaming" class="flex items-center gap-2 py-2 px-3 text-slate-500">
@@ -117,6 +123,7 @@ const scrollContainerRef = ref<HTMLElement | null>(null)
 const showNewMessagesButton = ref(false)
 const isAtBottom = ref(true)
 const lightboxImage = ref<string | null>(null)
+const animateMessages = ref(false)
 
 // Scroll handling
 const handleScroll = () => {
@@ -150,17 +157,24 @@ const handleScrollToBottom = () => {
 // Watch for new messages
 watch(() => props.messages.length, (newLength, oldLength) => {
   if (newLength > oldLength) {
-    // New message added
+    // Enable animation after first batch loads
+    if (!animateMessages.value && oldLength > 0) {
+      animateMessages.value = true
+    }
+
     const lastMessage = props.messages[props.messages.length - 1]
-    
-    if (isAtBottom.value || lastMessage?.role === 'user') {
-      // Auto-scroll if at bottom or user sent the message
+
+    if (isAtBottom.value || lastMessage?.role === 'user' || lastMessage?.role === 'manager') {
       nextTick(() => scrollToBottom(false))
     } else if (lastMessage?.role === 'agent') {
-      // Show "new messages" button if not at bottom
       showNewMessagesButton.value = true
     }
   }
+})
+
+// Reset animation flag when dialog changes (so initial load doesn't animate)
+watch(() => props.dialogId, () => {
+  animateMessages.value = false
 })
 
 // Watch for streaming to keep scroll at bottom
@@ -201,6 +215,16 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* Message enter animation — subtle slide-up + fade */
+.msg-enter-active {
+  transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+}
+.msg-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+/* Lightbox */
 .lightbox-fade-enter-active,
 .lightbox-fade-leave-active {
   transition: opacity 0.2s ease;

@@ -22,17 +22,13 @@ export default defineNuxtConfig({
   },
 
   nitro: {
-    preset: "node-server",
+    // В dev-режиме проксируем API на бэкенд
     devProxy: {
       "/api/v1": {
         target: "https://agentsapp.integration-ai.ru",
         changeOrigin: true,
         prependPath: true,
       },
-    },
-    routeRules: {
-      // API routes proxy to backend in development
-      "/api/v1/**": { proxy: "https://agentsapp.integration-ai.ru/api/v1/**" },
     },
   },
 

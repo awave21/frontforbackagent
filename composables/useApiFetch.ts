@@ -175,10 +175,16 @@ export const useApiFetch = () => {
 
   const apiFetch = $fetch.create({
     baseURL: apiBase,
-    async onRequest({ options }) {
+    async onRequest({ request, options }) {
       // Автоматически добавляем токен авторизации, если он есть
       // Получаем токен динамически при каждом запросе
       if (typeof window !== 'undefined') {
+        // Для эндпоинтов login/register НЕ нужна авторизация и обновление токена —
+        // они принимают email/password, а не Bearer token
+        const reqUrl = typeof request === 'string' ? request : (request as Request).url
+        const isPublicAuthEndpoint = reqUrl.includes('/auth/login') || reqUrl.includes('/auth/register')
+        if (isPublicAuthEndpoint) return
+
         let token = localStorage.getItem('auth_token')
         
         // Проверяем валидность токена перед использованием
@@ -210,8 +216,15 @@ export const useApiFetch = () => {
     async onResponseError({ request, response, options }) {
       const retryOptions = options as any
 
+      // Определяем URL запроса для проверки типа
+      const requestUrl = typeof request === 'string' ? request : (request as Request).url
+
       // Если получили 401, пробуем обновить токен и повторить запрос
-      if (response.status === 401 && typeof window !== 'undefined') {
+      // НО: для эндпоинтов аутентификации (login, register) НЕ делаем retry —
+      // 401 на login означает неверные учётные данные, а не истекший токен
+      const isLoginOrRegister = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register')
+
+      if (response.status === 401 && typeof window !== 'undefined' && !isLoginOrRegister) {
         // Защита от бесконечного цикла ретраев
         if (retryOptions?._retry) {
           console.warn('🔴 Request retried and still unauthorized, redirecting to login')
@@ -260,7 +273,6 @@ export const useApiFetch = () => {
       
       // Обработка 409 Conflict - только для auth-запросов (token refresh)
       // Для других запросов 409 означает бизнес-конфликт (например, "ресурс уже существует")
-      const requestUrl = typeof request === 'string' ? request : (request as Request).url
       const isAuthRequest = requestUrl.includes('/auth/')
       
       if (response.status === 409 && typeof window !== 'undefined' && isAuthRequest) {
@@ -288,6 +300,30 @@ export const useApiFetch = () => {
             }
           }
         }
+      }
+
+      // Обработка 403 (Forbidden) - недостаточно прав
+      if (response.status === 403 && typeof window !== 'undefined') {
+        const isAuthRequestFor403 = requestUrl.includes('/auth/')
+        
+        // Для не-auth запросов показываем сообщение о недостаточных правах
+        if (!isAuthRequestFor403) {
+          // Используем динамический импорт useToast, чтобы избежать циклических зависимостей
+          try {
+            const { useToast } = await import('./useToast')
+            const toast = useToast()
+            toast.error('Недостаточно прав', 'У вас нет доступа к выполнению этого действия.')
+          } catch (err) {
+            console.error('Failed to show 403 error toast:', err)
+          }
+        }
+        
+        // Не очищаем токены для 403 (в отличие от 401)
+        // Пользователь авторизован, но не имеет прав на действие
+        console.warn('🔒 Access forbidden (403):', {
+          url: requestUrl,
+          message: 'Insufficient permissions'
+        })
       }
 
       // Обработка 429 (Rate Limiting)

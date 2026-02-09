@@ -41,9 +41,30 @@
     </div>
 
     <!-- Navigation -->
-    <nav class="p-4 sm:p-3">
+    <nav class="p-4 sm:p-3 overflow-y-auto max-h-[calc(100vh-200px)]">
       <ul class="space-y-2">
-        <li v-for="item in menuItems" :key="item.name">
+        <!-- Back Button for Agent Detail -->
+        <li v-if="isAgentDetail">
+          <button
+            @click="handleBackToAgents"
+            class="w-full flex items-center text-base sm:text-sm font-medium rounded-lg transition-all duration-200 group relative px-4 py-3 sm:py-2.5 text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+            :class="[isCollapsed ? 'justify-center px-3' : 'px-4']"
+          >
+            <ArrowLeft
+              class="w-5 h-5 shrink-0 transition-transform"
+              :class="[!isCollapsed && 'mr-3']"
+            />
+            <span v-show="!isCollapsed" class="whitespace-nowrap">Назад к агентам</span>
+            <div
+              v-if="isCollapsed"
+              class="absolute left-full ml-2 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 shadow-lg"
+            >
+              Назад к агентам
+            </div>
+          </button>
+        </li>
+
+        <li v-for="item in currentMenuItems" :key="item.name">
           <NuxtLink
             :to="item.path"
             @click="emit('close')"
@@ -68,7 +89,6 @@
               {{ item.name }}
             </span>
             
-            <!-- Tooltip for collapsed mode -->
             <div
               v-if="isCollapsed"
               class="absolute left-full ml-2 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 shadow-lg"
@@ -122,7 +142,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   LayoutDashboard,
   Bot,
@@ -134,12 +155,24 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  LogOut
+  LogOut,
+  ArrowLeft,
+  Sparkles,
+  Radio,
+  Link,
+  Database,
+  Cpu
 } from 'lucide-vue-next'
 import { useAuth } from '../composables/useAuth'
 
 // Auth composable
 const { user, tenant, logout } = useAuth()
+const route = useRoute()
+const router = useRouter()
+
+const emit = defineEmits<{
+  close: []
+}>()
 
 // Функция для преобразования ролей в русские названия
 const getRoleDisplayName = (role: string): string => {
@@ -168,6 +201,14 @@ const handleLogout = () => {
   // Перенаправление происходит внутри logout()
 }
 
+const isAgentDetail = computed(() => {
+  return route.name?.toString().startsWith('agents-id')
+})
+
+const handleBackToAgents = () => {
+  router.push('/agents')
+}
+
 onMounted(() => {
   if (process.client) {
     const saved = localStorage.getItem('sidebar-collapsed')
@@ -176,10 +217,6 @@ onMounted(() => {
     }
   }
 })
-
-const emit = defineEmits<{
-  close: []
-}>()
 
 const menuItems = [
   {
@@ -218,4 +255,27 @@ const menuItems = [
     icon: Settings
   }
 ]
+
+const agentMenuItems = [
+  { id: 'prompt', name: 'Системный промпт', icon: Sparkles, path: (id: string) => `/agents/${id}/prompt` },
+  { id: 'channels', name: 'Каналы', icon: Radio, path: (id: string) => `/agents/${id}/channels` },
+  { id: 'connections', name: 'Интеграции', icon: Link, path: (id: string) => `/agents/${id}/connections` },
+  { id: 'knowledge', name: 'База знаний', icon: Database, path: (id: string) => `/agents/${id}/knowledge` },
+  { id: 'model', name: 'Модель', icon: Cpu, path: (id: string) => `/agents/${id}/model` },
+  { id: 'chat', name: 'Чат', icon: MessageSquare, path: (id: string) => `/agents/${id}/chat` },
+  { id: 'settings', name: 'Настройки', icon: Settings, path: (id: string) => `/agents/${id}/settings` },
+]
+
+const currentMenuItems = computed(() => {
+  if (isAgentDetail.value) {
+    const agentId = route.params.id as string
+    const items = agentMenuItems.map(item => ({
+      ...item,
+      path: item.path(agentId)
+    }))
+    
+    return items
+  }
+  return menuItems
+})
 </script>

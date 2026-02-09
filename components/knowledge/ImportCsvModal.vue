@@ -1,236 +1,216 @@
 <template>
-  <Teleport to="body">
-    <Transition name="modal-fade">
-      <div
-        v-if="isOpen"
-        class="fixed inset-0 z-[60] flex items-center justify-center px-4 py-6 sm:px-6"
-        aria-modal="true"
-        role="dialog"
-      >
-        <div class="fixed inset-0 bg-black/40 backdrop-blur-sm" @click="handleClose"></div>
-        <div
-          class="relative w-full max-w-2xl max-h-[90vh] overflow-hidden rounded-2xl bg-white shadow-xl shadow-indigo-900/20 ring-1 ring-indigo-100 flex flex-col"
-          @click.stop
-        >
-          <!-- Header -->
-          <div class="flex items-center justify-between p-6 border-b border-slate-100">
-            <div>
-              <h2 class="text-lg font-bold text-slate-900">Импорт из CSV</h2>
-              <p class="text-sm text-slate-500 mt-1">{{ directoryName }}</p>
-            </div>
-            <button 
-              aria-label="Закрыть" 
-              class="text-slate-400 hover:text-slate-600 p-1" 
-              @click="handleClose"
-            >
-              <X class="h-5 w-5" />
-            </button>
+  <Dialog :open="isOpen" @update:open="(v) => !v && handleClose()">
+    <DialogContent class-name="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <!-- Header -->
+      <div class="flex items-center justify-between p-6 border-b border-slate-100">
+        <DialogHeader>
+          <DialogTitle>Импорт из CSV</DialogTitle>
+          <DialogDescription>{{ directoryName }}</DialogDescription>
+        </DialogHeader>
+        <DialogClose />
+      </div>
+
+      <!-- Content -->
+      <div class="flex-1 overflow-y-auto p-6">
+        <!-- Step 1: File Upload -->
+        <div v-if="step === 'upload'">
+          <div
+            class="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center hover:border-indigo-300 hover:bg-indigo-50/30 transition-all cursor-pointer"
+            :class="{ 'border-indigo-400 bg-indigo-50': isDragging }"
+            @dragover.prevent="isDragging = true"
+            @dragleave.prevent="isDragging = false"
+            @drop.prevent="handleDrop"
+            @click="triggerFileInput"
+          >
+            <input
+              ref="fileInputRef"
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              class="hidden"
+              @change="handleFileSelect"
+            />
+            <Upload class="w-12 h-12 text-slate-400 mx-auto mb-4" />
+            <p class="text-slate-700 font-medium">Перетащите файл сюда</p>
+            <p class="text-slate-500 text-sm mt-1">или нажмите для выбора</p>
+            <p class="text-slate-400 text-xs mt-3">Поддерживаются .csv и .xlsx до 10 МБ</p>
           </div>
+          
+          <p v-if="uploadError" class="mt-4 text-sm text-red-600">{{ uploadError }}</p>
+        </div>
 
-          <!-- Content -->
-          <div class="flex-1 overflow-y-auto p-6">
-            <!-- Step 1: File Upload -->
-            <div v-if="step === 'upload'">
-              <div
-                class="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center hover:border-indigo-300 hover:bg-indigo-50/30 transition-all cursor-pointer"
-                :class="{ 'border-indigo-400 bg-indigo-50': isDragging }"
-                @dragover.prevent="isDragging = true"
-                @dragleave.prevent="isDragging = false"
-                @drop.prevent="handleDrop"
-                @click="triggerFileInput"
-              >
-                <input
-                  ref="fileInputRef"
-                  type="file"
-                  accept=".csv,.xlsx,.xls"
-                  class="hidden"
-                  @change="handleFileSelect"
-                />
-                <Upload class="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                <p class="text-slate-700 font-medium">Перетащите файл сюда</p>
-                <p class="text-slate-500 text-sm mt-1">или нажмите для выбора</p>
-                <p class="text-slate-400 text-xs mt-3">Поддерживаются .csv и .xlsx до 10 МБ</p>
+        <!-- Step 2: Mapping -->
+        <div v-else-if="step === 'mapping'" class="space-y-5">
+          <!-- File info -->
+          <div class="flex items-center justify-between bg-slate-50 rounded-xl p-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-white rounded-lg flex items-center justify-center border border-slate-200">
+                <FileSpreadsheet class="w-5 h-5 text-emerald-600" />
               </div>
-              
-              <p v-if="uploadError" class="mt-4 text-sm text-red-600">{{ uploadError }}</p>
-            </div>
-
-            <!-- Step 2: Mapping -->
-            <div v-else-if="step === 'mapping'" class="space-y-5">
-              <!-- File info -->
-              <div class="flex items-center justify-between bg-slate-50 rounded-xl p-4">
-                <div class="flex items-center gap-3">
-                  <div class="w-10 h-10 bg-white rounded-lg flex items-center justify-center border border-slate-200">
-                    <FileSpreadsheet class="w-5 h-5 text-emerald-600" />
-                  </div>
-                  <div>
-                    <p class="font-medium text-slate-900 text-sm">{{ selectedFile?.name }}</p>
-                    <p class="text-xs text-slate-500">{{ previewData?.rows_count }} строк</p>
-                  </div>
-                </div>
-                <button
-                  @click="resetFile"
-                  class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Удалить файл"
-                >
-                  <Trash2 class="w-4 h-4" />
-                </button>
-              </div>
-
-              <!-- Column Mapping -->
               <div>
-                <p class="text-sm font-medium text-slate-700 mb-3">Сопоставьте колонки файла с полями справочника</p>
-                <div class="space-y-3">
-                  <div 
-                    v-for="fileCol in previewData?.columns" 
-                    :key="fileCol"
-                    class="flex items-center gap-3"
-                  >
-                    <div class="flex-1 px-4 py-2.5 bg-slate-50 rounded-lg text-sm text-slate-700 truncate border border-slate-100">
-                      "{{ fileCol }}"
-                    </div>
-                    <ArrowRight class="w-4 h-4 text-slate-400 flex-shrink-0" />
-                    <select
-                      v-model="columnMapping[fileCol]"
-                      class="flex-1 px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                    >
-                      <option :value="null">— Пропустить —</option>
-                      <option 
-                        v-for="col in columns" 
-                        :key="col.name" 
-                        :value="col.name"
-                        :disabled="isMapped(col.name, fileCol)"
-                      >
-                        {{ col.label }}
-                      </option>
-                    </select>
-                  </div>
-                </div>
+                <p class="font-medium text-slate-900 text-sm">{{ selectedFile?.name }}</p>
+                <p class="text-xs text-slate-500">{{ previewData?.rows_count }} строк</p>
               </div>
-
-              <!-- Options -->
-              <div class="space-y-3 pt-2">
-                <label class="flex items-center gap-3 cursor-pointer">
-                  <input
-                    v-model="hasHeader"
-                    type="checkbox"
-                    class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <span class="text-sm text-slate-700">Первая строка — заголовки</span>
-                </label>
-                <label class="flex items-center gap-3 cursor-pointer">
-                  <input
-                    v-model="replaceAll"
-                    type="checkbox"
-                    class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <span class="text-sm text-slate-700">Заменить все существующие записи</span>
-                </label>
-              </div>
-
-              <!-- Preview Table -->
-              <div v-if="previewData?.preview?.length" class="pt-2">
-                <p class="text-sm font-medium text-slate-700 mb-3">Превью (первые 3 записи)</p>
-                <div class="overflow-x-auto rounded-lg border border-slate-200">
-                  <table class="w-full text-sm">
-                    <thead>
-                      <tr class="bg-slate-50 border-b border-slate-200">
-                        <th 
-                          v-for="(fileCol, idx) in previewData.columns" 
-                          :key="idx"
-                          class="px-3 py-2 text-left text-xs font-bold text-slate-500 uppercase whitespace-nowrap"
-                        >
-                          {{ getMappedLabel(fileCol) || fileCol }}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                      <tr v-for="(row, rowIdx) in previewData.preview" :key="rowIdx">
-                        <td 
-                          v-for="(cell, cellIdx) in row" 
-                          :key="cellIdx"
-                          class="px-3 py-2 text-slate-600 truncate max-w-[200px]"
-                        >
-                          {{ cell || '—' }}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <p v-if="mappingError" class="text-sm text-red-600">{{ mappingError }}</p>
             </div>
+            <button
+              @click="resetFile"
+              class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+              title="Удалить файл"
+            >
+              <Trash2 class="w-4 h-4" />
+            </button>
+          </div>
 
-            <!-- Step 3: Result -->
-            <div v-else-if="step === 'result'" class="text-center py-6">
+          <!-- Column Mapping -->
+          <div>
+            <p class="text-sm font-medium text-slate-700 mb-3">Сопоставьте колонки файла с полями справочника</p>
+            <div class="space-y-3">
               <div 
-                class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
-                :class="[importResult?.errors?.length ? 'bg-yellow-100' : 'bg-emerald-100']"
+                v-for="fileCol in previewData?.columns" 
+                :key="fileCol"
+                class="flex items-center gap-3"
               >
-                <component 
-                  :is="importResult?.errors?.length ? AlertCircle : CheckCircle" 
-                  class="w-8 h-8"
-                  :class="[importResult?.errors?.length ? 'text-yellow-600' : 'text-emerald-600']"
-                />
+                <div class="flex-1 px-4 py-2.5 bg-slate-50 rounded-lg text-sm text-slate-700 truncate border border-slate-100">
+                  "{{ fileCol }}"
+                </div>
+                <ArrowRight class="w-4 h-4 text-slate-400 flex-shrink-0" />
+                <select
+                  v-model="columnMapping[fileCol]"
+                  class="flex-1 px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                >
+                  <option :value="null">— Пропустить —</option>
+                  <option 
+                    v-for="col in columns" 
+                    :key="col.name" 
+                    :value="col.name"
+                    :disabled="isMapped(col.name, fileCol)"
+                  >
+                    {{ col.label }}
+                  </option>
+                </select>
               </div>
-              <h3 class="text-lg font-bold text-slate-900">
-                {{ importResult?.errors?.length ? 'Импорт завершён с предупреждениями' : 'Импорт успешно завершён' }}
-              </h3>
-              <p class="text-slate-500 mt-2">
-                Добавлено записей: <span class="font-bold text-slate-700">{{ importResult?.created }}</span>
-              </p>
-              <p v-if="importResult?.errors?.length" class="text-slate-500">
-                Пропущено (ошибки): <span class="font-bold text-yellow-600">{{ importResult.errors.length }}</span>
-              </p>
-              
-              <button
-                v-if="importResult?.errors?.length"
-                @click="downloadErrorLog"
-                class="mt-4 px-4 py-2 text-sm text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors"
-              >
-                Скачать лог ошибок
-              </button>
             </div>
           </div>
 
-          <!-- Footer -->
-          <div class="flex items-center justify-end gap-3 p-6 border-t border-slate-100 bg-slate-50">
-            <button
-              v-if="step !== 'result'"
-              type="button"
-              class="px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
-              @click="handleClose"
-            >
-              Отмена
-            </button>
-            <button
-              v-if="step === 'mapping'"
-              @click="handleImport"
-              class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-              :disabled="isImporting || !hasValidMapping"
-            >
-              <Loader2 v-if="isImporting" class="w-4 h-4 animate-spin" />
-              <span>{{ isImporting ? 'Импорт...' : 'Импортировать' }}</span>
-            </button>
-            <button
-              v-if="step === 'result'"
-              @click="handleClose"
-              class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors"
-            >
-              Готово
-            </button>
+          <!-- Options -->
+          <div class="space-y-3 pt-2">
+            <label class="flex items-center gap-3 cursor-pointer">
+              <input
+                v-model="hasHeader"
+                type="checkbox"
+                class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <span class="text-sm text-slate-700">Первая строка — заголовки</span>
+            </label>
+            <label class="flex items-center gap-3 cursor-pointer">
+              <input
+                v-model="replaceAll"
+                type="checkbox"
+                class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <span class="text-sm text-slate-700">Заменить все существующие записи</span>
+            </label>
           </div>
+
+          <!-- Preview Table -->
+          <div v-if="previewData?.preview?.length" class="pt-2">
+            <p class="text-sm font-medium text-slate-700 mb-3">Превью (первые 3 записи)</p>
+            <div class="overflow-x-auto rounded-lg border border-slate-200">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200">
+                    <th 
+                      v-for="(fileCol, idx) in previewData.columns" 
+                      :key="idx"
+                      class="px-3 py-2 text-left text-xs font-bold text-slate-500 uppercase whitespace-nowrap"
+                    >
+                      {{ getMappedLabel(fileCol) || fileCol }}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  <tr v-for="(row, rowIdx) in previewData.preview" :key="rowIdx">
+                    <td 
+                      v-for="(cell, cellIdx) in row" 
+                      :key="cellIdx"
+                      class="px-3 py-2 text-slate-600 truncate max-w-[200px]"
+                    >
+                      {{ cell || '—' }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <p v-if="mappingError" class="text-sm text-red-600">{{ mappingError }}</p>
+        </div>
+
+        <!-- Step 3: Result -->
+        <div v-else-if="step === 'result'" class="text-center py-6">
+          <div 
+            class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+            :class="[importResult?.errors?.length ? 'bg-yellow-100' : 'bg-emerald-100']"
+          >
+            <component 
+              :is="importResult?.errors?.length ? AlertCircle : CheckCircle" 
+              class="w-8 h-8"
+              :class="[importResult?.errors?.length ? 'text-yellow-600' : 'text-emerald-600']"
+            />
+          </div>
+          <h3 class="text-lg font-bold text-slate-900">
+            {{ importResult?.errors?.length ? 'Импорт завершён с предупреждениями' : 'Импорт успешно завершён' }}
+          </h3>
+          <p class="text-slate-500 mt-2">
+            Добавлено записей: <span class="font-bold text-slate-700">{{ importResult?.created }}</span>
+          </p>
+          <p v-if="importResult?.errors?.length" class="text-slate-500">
+            Пропущено (ошибки): <span class="font-bold text-yellow-600">{{ importResult.errors.length }}</span>
+          </p>
+          
+          <button
+            v-if="importResult?.errors?.length"
+            @click="downloadErrorLog"
+            class="mt-4 px-4 py-2 text-sm text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors"
+          >
+            Скачать лог ошибок
+          </button>
         </div>
       </div>
-    </Transition>
-  </Teleport>
+
+      <!-- Footer -->
+      <DialogFooter class-name="p-6 border-t border-slate-100 bg-slate-50">
+        <button
+          v-if="step !== 'result'"
+          type="button"
+          class="px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+          @click="handleClose"
+        >
+          Отмена
+        </button>
+        <button
+          v-if="step === 'mapping'"
+          @click="handleImport"
+          class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+          :disabled="isImporting || !hasValidMapping"
+        >
+          <Loader2 v-if="isImporting" class="w-4 h-4 animate-spin" />
+          <span>{{ isImporting ? 'Импорт...' : 'Импортировать' }}</span>
+        </button>
+        <button
+          v-if="step === 'result'"
+          @click="handleClose"
+          class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors"
+        >
+          Готово
+        </button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { 
-  X, 
   Upload, 
   FileSpreadsheet, 
   Trash2, 
@@ -239,13 +219,16 @@ import {
   CheckCircle,
   AlertCircle
 } from 'lucide-vue-next'
-
-type Column = {
-  name: string
-  label: string
-  type: string
-  required: boolean
-}
+import type { DirectoryColumn, ImportResult } from '~/types/directories'
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+  DialogClose,
+  DialogHeader,
+  DialogFooter
+} from '~/components/ui/dialog'
 
 type PreviewData = {
   columns: string[]
@@ -254,15 +237,10 @@ type PreviewData = {
   suggested_mapping?: Record<string, string | null>
 }
 
-type ImportResult = {
-  created: number
-  errors?: { row: number; error: string }[]
-}
-
 const props = defineProps<{
   isOpen: boolean
   directoryName: string
-  columns: Column[]
+  columns: DirectoryColumn[]
 }>()
 
 const emit = defineEmits<{
@@ -285,7 +263,6 @@ const replaceAll = ref(false)
 const importResult = ref<ImportResult | null>(null)
 
 const hasValidMapping = computed(() => {
-  // Проверяем что все обязательные поля замаплены
   const mappedColumns = Object.values(columnMapping.value).filter(v => v !== null)
   const requiredColumns = props.columns.filter(c => c.required).map(c => c.name)
   return requiredColumns.every(name => mappedColumns.includes(name))
@@ -326,7 +303,6 @@ const handleDrop = (e: DragEvent) => {
 const processFile = async (file: File) => {
   uploadError.value = ''
   
-  // Проверка типа
   const validTypes = ['.csv', '.xlsx', '.xls']
   const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase()
   if (!validTypes.includes(ext)) {
@@ -334,7 +310,6 @@ const processFile = async (file: File) => {
     return
   }
   
-  // Проверка размера (10 МБ)
   if (file.size > 10 * 1024 * 1024) {
     uploadError.value = 'Файл слишком большой. Максимум 10 МБ'
     return
@@ -342,7 +317,6 @@ const processFile = async (file: File) => {
   
   selectedFile.value = file
   
-  // Парсим CSV локально для превью
   try {
     const text = await file.text()
     const lines = text.split('\n').filter(line => line.trim())
@@ -359,7 +333,6 @@ const processFile = async (file: File) => {
       preview
     }
     
-    // Автоматический маппинг по совпадению имён
     const mapping: Record<string, string | null> = {}
     for (const fileCol of columns) {
       const lowerFileCol = fileCol.toLowerCase()
@@ -372,7 +345,7 @@ const processFile = async (file: File) => {
     columnMapping.value = mapping
     
     step.value = 'mapping'
-  } catch (err) {
+  } catch {
     uploadError.value = 'Не удалось прочитать файл'
   }
 }
@@ -426,7 +399,6 @@ const handleClose = () => {
   emit('close')
 }
 
-// Методы для родителя
 const setResult = (result: ImportResult) => {
   importResult.value = result
   isImporting.value = false
@@ -449,15 +421,3 @@ defineExpose({
   setError
 })
 </script>
-
-<style scoped>
-.modal-fade-enter-active,
-.modal-fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.modal-fade-enter-from,
-.modal-fade-leave-to {
-  opacity: 0;
-}
-</style>

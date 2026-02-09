@@ -101,7 +101,7 @@
               
               <!-- Create New Agent Button (Header) -->
               <NuxtLink
-                v-if="isAuthenticated"
+                v-if="isAuthenticated && canEditAgents"
                 to="/agents/new"
                 class="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-600 hover:to-purple-700 transition-colors shadow-sm shadow-indigo-100"
               >
@@ -157,7 +157,7 @@
             <h3 class="text-lg font-medium text-slate-900 mb-2">Нет агентов</h3>
             <p class="text-slate-600 mb-4">Создайте своего первого AI-агента</p>
             <NuxtLink
-              v-if="isAuthenticated"
+              v-if="isAuthenticated && canEditAgents"
               to="/agents/new"
               class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
             >
@@ -218,6 +218,7 @@ import {
 } from "lucide-vue-next";
 import { useAgents, type Agent } from "../../composables/useAgents";
 import { useAuth } from "../../composables/useAuth";
+import { usePermissions } from "../../composables/usePermissions";
 
 // Mobile sidebar state
 const isSidebarOpen = ref(false);
@@ -227,6 +228,9 @@ const router = useRouter();
 
 // Auth state
 const { isAuthenticated } = useAuth();
+
+// Permissions
+const { canEditAgents } = usePermissions();
 
 // Get agents data
 const { agents, fetchAgents, isLoading: agentsLoading, error: agentsError } = useAgents();

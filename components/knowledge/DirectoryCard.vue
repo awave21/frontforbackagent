@@ -26,17 +26,11 @@
         >
           <Settings class="w-4 h-4" />
         </button>
-        <button
-          @click="handleToggle"
-          class="relative w-11 h-6 rounded-full transition-colors"
-          :class="[directory.is_enabled ? 'bg-emerald-500' : 'bg-slate-200']"
+        <Switch
+          :model-value="directory.is_enabled"
+          @update:model-value="(val: boolean) => $emit('toggle', val)"
           :title="directory.is_enabled ? 'Выключить' : 'Включить'"
-        >
-          <span
-            class="absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform"
-            :class="[directory.is_enabled ? 'left-6' : 'left-1']"
-          ></span>
-        </button>
+        />
       </div>
     </div>
   </div>
@@ -52,23 +46,9 @@ import {
   List,
   Settings
 } from 'lucide-vue-next'
-
-type Directory = {
-  id: string
-  agent_id?: string
-  name: string
-  slug?: string
-  tool_name: string
-  tool_description?: string
-  template: string
-  columns?: any[]
-  response_mode?: string
-  search_type?: string
-  items_count: number
-  is_enabled: boolean
-  created_at?: string
-  updated_at?: string
-}
+import type { Directory } from '~/types/directories'
+import { Switch } from '~/components/ui/switch'
+import { pluralize } from '~/utils/pluralize'
 
 const props = defineProps<{
   directory: Directory
@@ -91,21 +71,8 @@ const templateIcon = computed(() => {
   return icons[props.directory.template] || List
 })
 
-const itemsLabel = computed(() => {
-  const count = props.directory.items_count
-  if (count === 0) return 'записей'
-  if (count === 1) return 'запись'
-  if (count >= 2 && count <= 4) return 'записи'
-  if (count >= 5 && count <= 20) return 'записей'
-  const lastDigit = count % 10
-  const lastTwoDigits = count % 100
-  if (lastTwoDigits >= 11 && lastTwoDigits <= 19) return 'записей'
-  if (lastDigit === 1) return 'запись'
-  if (lastDigit >= 2 && lastDigit <= 4) return 'записи'
-  return 'записей'
-})
+const itemsLabel = computed(() =>
+  pluralize(props.directory.items_count, ['запись', 'записи', 'записей'])
+)
 
-const handleToggle = () => {
-  emit('toggle', !props.directory.is_enabled)
-}
 </script>

@@ -1,13 +1,13 @@
 <template>
   <div class="bg-white border-t border-slate-200 px-4 py-3 flex-shrink-0">
-    <!-- Disabled Agent Notice -->
+    <!-- Manager Mode Notice (agent disabled) -->
     <div
       v-if="!agentEnabled"
-      class="mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2"
+      class="mb-3 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2"
     >
-      <AlertCircle class="w-4 h-4 text-amber-600 flex-shrink-0" />
-      <span class="text-xs text-amber-700">
-        Агент выключен. Сообщения будут сохранены, но ответы не будут генерироваться.
+      <UserCheck class="w-4 h-4 text-emerald-600 flex-shrink-0" />
+      <span class="text-xs text-emerald-700">
+        Режим менеджера. Сообщения будут отправлены от вашего имени.
       </span>
     </div>
 
@@ -81,7 +81,7 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, watch } from 'vue'
-import { Send, ImageIcon, Mic, Loader2, AlertCircle } from 'lucide-vue-next'
+import { Send, ImageIcon, Mic, Loader2, UserCheck } from 'lucide-vue-next'
 
 const props = defineProps<{
   isSending?: boolean

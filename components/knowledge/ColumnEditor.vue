@@ -133,6 +133,8 @@
 import { ref, watch } from 'vue'
 import { Plus, GripVertical, Trash2 } from 'lucide-vue-next'
 import draggable from 'vuedraggable'
+import { transliterate } from '~/utils/translit'
+import { isValidSlugName } from '~/utils/directory-helpers'
 
 export type ColumnDefinition = {
   id: string
@@ -165,33 +167,15 @@ watch(() => props.modelValue, (value) => {
 
 const generateId = () => Math.random().toString(36).substring(2, 9)
 
-// Транслитерация для автогенерации name из label
-const translitMap: Record<string, string> = {
-  'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e',
-  'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
-  'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
-  'ф': 'f', 'х': 'h', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'sch', 'ъ': '',
-  'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya', ' ': '_', '-': '_'
-}
-
 const generateName = (col: ColumnDefinition) => {
   if (!col.label) {
     col.name = ''
     return
   }
-  
-  const label = col.label.toLowerCase()
-  let result = ''
-  for (const char of label) {
-    result += translitMap[char] ?? char
-  }
-  col.name = result.replace(/[^a-z0-9_]/g, '').replace(/_+/g, '_').substring(0, 50)
+  col.name = transliterate(col.label)
 }
 
-const isValidName = (name: string) => {
-  if (!name) return true
-  return /^[a-z][a-z0-9_]*$/.test(name)
-}
+const isValidName = (name: string) => isValidSlugName(name)
 
 const isDuplicateName = (name: string, currentIndex: number) => {
   if (!name) return false

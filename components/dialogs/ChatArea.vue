@@ -3,6 +3,7 @@
     <!-- Chat Header -->
     <ChatHeader
       :agent="agent"
+      :dialog="currentDialog"
       :is-streaming="isStreaming"
       @back="$emit('back')"
     />
@@ -30,12 +31,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch, onMounted } from 'vue'
+import { computed, watch } from 'vue'
 import ChatHeader from './ChatHeader.vue'
 import MessagesFeed from './MessagesFeed.vue'
 import MessageComposer from './MessageComposer.vue'
 import { useMessages } from '../../composables/useMessages'
-import { useAgentEnabled } from '../../composables/useAgentEnabled'
 import { useDialogs } from '../../composables/useDialogs'
 import type { Agent } from '../../composables/useAgents'
 
@@ -55,6 +55,7 @@ const {
   messagesMap,
   fetchMessages,
   sendMessage,
+  sendManagerMessage,
   retryMessage,
   createOptimisticMessage,
   markMessageFailed,
@@ -64,25 +65,17 @@ const {
   dialogHasMore
 } = useMessages()
 
-const { isAgentEnabled: checkAgentEnabled } = useAgentEnabled()
-const { markAsRead } = useDialogs()
+const { markAsRead, getDialogById } = useDialogs()
 
-// Computed - use messagesMap.value directly for proper reactivity
-const messages = computed(() => {
-  // Access messagesMap.value first to create dependency on the entire object
-  const allMessages = messagesMap.value
-  const msgs = allMessages[props.dialogId] || []
-  console.log(`[ChatArea] computed messages for ${props.dialogId}:`, msgs.length)
-  return msgs
-})
+// Computed
+const messages = computed(() => messagesMap[props.dialogId] ?? [])
+const currentDialog = computed(() => getDialogById(props.dialogId))
 const hasMore = computed(() => dialogHasMore(props.dialogId))
-const isAgentEnabled = computed(() => checkAgentEnabled(props.agent.id))
+const isAgentEnabled = computed(() => (currentDialog.value?.agent_status ?? 'active') === 'active')
 
 // Load messages on mount and dialog change
 const loadMessages = async () => {
-  console.log('[ChatArea] Loading messages for:', { agentId: props.agent.id, dialogId: props.dialogId })
   await fetchMessages(props.agent.id, props.dialogId, { limit: 50 })
-  console.log('[ChatArea] Messages loaded:', messages.value.length)
   markAsRead(props.dialogId)
 }
 
@@ -95,31 +88,25 @@ const loadMoreMessages = async () => {
 
 // Handlers
 const handleSend = async (content: string) => {
-  // Use WebSocket if connected, otherwise fall back to HTTP
+  // When agent is paused — send as manager message
+  if (!isAgentEnabled.value) {
+    await sendManagerMessage(props.agent.id, props.dialogId, content)
+    return
+  }
+
   if (props.isWsConnected && props.wsSendMessage) {
-    console.log('[ChatArea] Sending via WebSocket')
-    
-    // Create optimistic message first
     const tempId = createOptimisticMessage(props.dialogId, content, 'text')
-    
-    // Send via WebSocket
     const sent = props.wsSendMessage(props.dialogId, content)
-    
     if (!sent) {
-      console.warn('[ChatArea] WebSocket send failed, message marked as failed')
       markMessageFailed(props.dialogId, tempId, 'WebSocket отключен')
     }
-    // Note: WebSocket events (run_start, run_result, etc.) will handle the rest
   } else {
-    console.log('[ChatArea] Sending via HTTP (WebSocket not connected)')
-    // HTTP fallback - uses existing SSE streaming
     await sendMessage(props.agent.id, props.dialogId, content, 'text', isAgentEnabled.value)
   }
 }
 
-const handleAttachImage = async (file: File) => {
+const handleAttachImage = async (_file: File) => {
   // TODO: Implement image upload
-  console.log('Attach image:', file.name)
 }
 
 const handleRetry = async (messageId: string) => {
@@ -127,11 +114,5 @@ const handleRetry = async (messageId: string) => {
 }
 
 // Watch for dialog changes
-watch(() => props.dialogId, () => {
-  loadMessages()
-}, { immediate: true })
-
-onMounted(() => {
-  loadMessages()
-})
+watch(() => props.dialogId, () => loadMessages(), { immediate: true })
 </script>

@@ -1,6 +1,19 @@
 // Dialog statuses for indicators
 export type DialogStatus = 'NEW' | 'IN_PROGRESS' | 'UNREAD' | 'ERROR' | 'NORMAL'
 
+// Per-dialog agent toggle status (active = agent responds, paused = agent silent)
+export type DialogAgentStatus = 'active' | 'paused'
+
+// User info from external platforms
+export type DialogUserInfo = {
+  platform?: string                 // 'telegram', 'whatsapp', 'web', etc.
+  platform_id?: string
+  session_id?: string
+  username?: string
+  first_name?: string
+  last_name?: string
+}
+
 // Dialog entity
 export type Dialog = {
   id: string
@@ -14,10 +27,15 @@ export type Dialog = {
   status: DialogStatus
   created_at: string
   updated_at?: string
+  // Platform info
+  platform?: string                 // 'telegram', 'whatsapp', 'web'
+  user_info?: DialogUserInfo
+  // Per-dialog agent status
+  agent_status?: DialogAgentStatus  // 'active' (default) or 'paused'
 }
 
 // Message types
-export type MessageRole = 'user' | 'agent'
+export type MessageRole = 'user' | 'agent' | 'manager'
 export type MessageType = 'text' | 'image' | 'voice'
 export type MessageStatus = 'sending' | 'sent' | 'failed' | 'streaming' | 'done'
 
@@ -48,6 +66,10 @@ export type UpdateDialogData = {
 export type SendMessageData = {
   content: string
   type: MessageType
+}
+
+export type SendManagerMessageData = {
+  content: string
 }
 
 export type DialogsListResponse = {

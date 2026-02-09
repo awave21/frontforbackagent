@@ -1,9 +1,29 @@
-import { ref, shallowRef, triggerRef } from 'vue'
-import type { Dialog, CreateDialogData, UpdateDialogData, DialogsListResponse } from '../types/dialogs'
+import { ref } from 'vue'
+import type { Dialog, DialogAgentStatus, CreateDialogData, UpdateDialogData, DialogsListResponse } from '../types/dialogs'
 import { useApiFetch } from './useApiFetch'
 
-// Shared state across components - using shallowRef for better reactivity with arrays
-const dialogs = shallowRef<Dialog[]>([])
+const AGENT_STATUSES = new Set<string>(['active', 'paused'])
+
+/**
+ * Normalize a raw dialog from the API:
+ * backend returns agent toggle as `status: "active"|"paused"`,
+ * but frontend uses `status` for UI indicators (IN_PROGRESS, etc.)
+ * so we move it to `agent_status` and reset `status` to 'NORMAL'.
+ */
+const normalizeDialog = (raw: any): Dialog => {
+  const agentStatus: DialogAgentStatus =
+    raw.status && AGENT_STATUSES.has(raw.status) ? raw.status : (raw.agent_status ?? 'active')
+
+  return {
+    ...raw,
+    agent_status: agentStatus,
+    // If backend returned 'active'/'paused' as status, reset to NORMAL for UI indicators
+    status: AGENT_STATUSES.has(raw.status) ? 'NORMAL' : (raw.status || 'NORMAL')
+  }
+}
+
+// Shared state across components - using ref for deep reactivity
+const dialogs = ref<Dialog[]>([])
 const isLoading = ref(false)
 const error = ref<string | null>(null)
 const currentAgentId = ref<string | null>(null)
@@ -33,12 +53,7 @@ export const useDialogs = () => {
       const queryString = params.toString()
       const url = `agents/${agentId}/dialogs${queryString ? `?${queryString}` : ''}`
 
-      console.log(`[useDialogs] Fetching dialogs from: ${url}`)
-
       const response = await apiFetch<DialogsListResponse | Dialog[]>(url)
-      
-      console.log(`[useDialogs] Raw response:`, response)
-      console.log(`[useDialogs] Response type:`, Array.isArray(response) ? 'array' : typeof response)
       
       // Handle both response formats: {dialogs: [...]} or direct array [...]
       let dialogsList: Dialog[] = []
@@ -51,14 +66,7 @@ export const useDialogs = () => {
         dialogsList = (response as any).items || []
       }
       
-      console.log(`[useDialogs] Received ${dialogsList.length} dialogs`, {
-        agentId,
-        dialogs: dialogsList
-      })
-
-      dialogs.value = dialogsList
-      triggerRef(dialogs) // Force reactivity update
-      console.log(`[useDialogs] dialogs.value set to:`, dialogs.value)
+      dialogs.value = dialogsList.map(normalizeDialog)
     } catch (err: any) {
       console.error('[useDialogs] Error fetching dialogs:', err)
       console.error('[useDialogs] Error details:', {
@@ -69,7 +77,6 @@ export const useDialogs = () => {
       const msg = err?.data?.detail ?? err?.data?.message ?? err?.message ?? 'Не удалось загрузить диалоги'
       error.value = typeof msg === 'string' ? msg : JSON.stringify(msg)
       dialogs.value = []
-      triggerRef(dialogs)
     } finally {
       isLoading.value = false
     }
@@ -91,9 +98,10 @@ export const useDialogs = () => {
         body: data || {}
       })
 
+      const normalized = normalizeDialog(response)
       // Add to the beginning of the list
-      dialogs.value = [response, ...dialogs.value]
-      return response
+      dialogs.value = [normalized, ...dialogs.value]
+      return normalized
     } catch (err: any) {
       const msg = err?.data?.detail ?? err?.data?.message ?? err?.message ?? 'Не удалось создать диалог'
       error.value = typeof msg === 'string' ? msg : JSON.stringify(msg)
@@ -110,19 +118,20 @@ export const useDialogs = () => {
     if (!agentId || !dialogId) return null
 
     try {
-      const response = await apiFetch<Dialog>(`agents/${agentId}/dialogs/${dialogId}`, {
+      const response = await apiFetch<Dialog>(`agents/${agentId}/dialogs/${encodeURIComponent(dialogId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: data
       })
 
+      const normalized = normalizeDialog(response)
       // Update in local state
       const index = dialogs.value.findIndex(d => d.id === dialogId)
       if (index !== -1) {
-        dialogs.value[index] = response
+        dialogs.value[index] = normalized
       }
 
-      return response
+      return normalized
     } catch (err: any) {
       const msg = err?.data?.detail ?? err?.data?.message ?? err?.message ?? 'Не удалось обновить диалог'
       error.value = typeof msg === 'string' ? msg : JSON.stringify(msg)
@@ -137,7 +146,7 @@ export const useDialogs = () => {
     if (!agentId || !dialogId) return false
 
     try {
-      await apiFetch(`agents/${agentId}/dialogs/${dialogId}`, {
+      await apiFetch(`agents/${agentId}/dialogs/${encodeURIComponent(dialogId)}`, {
         method: 'DELETE'
       })
 
@@ -148,6 +157,49 @@ export const useDialogs = () => {
       const msg = err?.data?.detail ?? err?.data?.message ?? err?.message ?? 'Не удалось удалить диалог'
       error.value = typeof msg === 'string' ? msg : JSON.stringify(msg)
       return false
+    }
+  }
+
+  /**
+   * Toggle per-dialog agent status (active <-> paused) via API
+   * PATCH /agents/{agent_id}/dialogs/{dialog_id}/status  { status: "paused"|"active" }
+   */
+  const toggleDialogAgentStatus = async (
+    agentId: string,
+    dialogId: string
+  ): Promise<DialogAgentStatus | null> => {
+    if (!agentId || !dialogId) return null
+
+    const idx = dialogs.value.findIndex(d => d.id === dialogId)
+    const currentStatus: DialogAgentStatus = idx !== -1
+      ? (dialogs.value[idx].agent_status ?? 'active')
+      : 'active'
+    const newStatus: DialogAgentStatus = currentStatus === 'active' ? 'paused' : 'active'
+
+    // Optimistic update
+    if (idx !== -1) {
+      dialogs.value[idx] = { ...dialogs.value[idx], agent_status: newStatus }
+    }
+
+    try {
+      await apiFetch(
+        `agents/${agentId}/dialogs/${encodeURIComponent(dialogId)}/status`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: { status: newStatus }
+        }
+      )
+      return newStatus
+    } catch (err: any) {
+      // Rollback on failure
+      if (idx !== -1) {
+        dialogs.value[idx] = { ...dialogs.value[idx], agent_status: currentStatus }
+      }
+      const msg = err?.data?.detail ?? err?.data?.message ?? err?.message ?? 'Не удалось изменить статус агента'
+      error.value = typeof msg === 'string' ? msg : JSON.stringify(msg)
+      console.error('[useDialogs] toggleDialogAgentStatus error:', err)
+      return null
     }
   }
 
@@ -228,30 +280,67 @@ export const useDialogs = () => {
     if (!id) return
 
     const index = dialogs.value.findIndex(d => d.id === id)
+    const existing = index !== -1 ? dialogs.value[index] : null
     
-    // Map incoming data to Dialog type if needed
-    const updatedDialog: Dialog = {
-      ...(index !== -1 ? dialogs.value[index] : {} as Dialog),
-      id,
-      title: dialogData.title || (index !== -1 ? dialogs.value[index].title : 'Новый диалог'),
-      last_message_preview: dialogData.last_message_preview || dialogData.content || (index !== -1 ? dialogs.value[index].last_message_preview : ''),
-      last_message_at: dialogData.last_message_at || dialogData.created_at || (index !== -1 ? dialogs.value[index].last_message_at : new Date().toISOString()),
-      unread_count: dialogData.is_new ? (index !== -1 ? dialogs.value[index].unread_count + 1 : 1) : (index !== -1 ? dialogs.value[index].unread_count : 0),
-      status: dialogData.status || (index !== -1 ? dialogs.value[index].status : 'NORMAL'),
-      created_at: dialogData.created_at || (index !== -1 ? dialogs.value[index].created_at : new Date().toISOString()),
-      updated_at: new Date().toISOString()
+    // Get user_info (prioritize new data over existing)
+    const userInfo = dialogData.user_info || existing?.user_info
+    
+    // Generate title from user_info (prioritize over backend title which often contains message preview)
+    let userTitle: string | null = null
+    if (userInfo) {
+      if (userInfo.first_name || userInfo.last_name) {
+        userTitle = [userInfo.first_name, userInfo.last_name].filter(Boolean).join(' ')
+      } else if (userInfo.username) {
+        userTitle = `@${userInfo.username}`
+      }
     }
+    
+    // Determine platform
+    const platform = dialogData.platform || existing?.platform || (id.startsWith('telegram:') ? 'telegram' : undefined)
+    
+    // For Telegram dialogs without user_info, generate title from ID
+    const fallbackTitle = platform === 'telegram' || id.startsWith('telegram:')
+      ? `Telegram #${id.replace('telegram:', '')}`
+      : 'Диалог'
+    
+    const finalTitle = userTitle || existing?.title || fallbackTitle
+    
+    // Map incoming data to Dialog type, then normalize status fields
+    const updatedDialog = normalizeDialog({
+      ...(existing || {}),
+      id,
+      title: finalTitle,
+      last_message_preview: dialogData.last_message_preview || dialogData.content || existing?.last_message_preview || '',
+      last_message_at: dialogData.last_message_at || dialogData.created_at || existing?.last_message_at || new Date().toISOString(),
+      unread_count: dialogData.is_new ? (existing?.unread_count ?? 0) + 1 : (existing?.unread_count ?? 0),
+      status: dialogData.status || existing?.status || 'NORMAL',
+      agent_status: dialogData.agent_status || existing?.agent_status,
+      created_at: dialogData.created_at || existing?.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      platform,
+      user_info: userInfo || existing?.user_info
+    })
 
     if (index !== -1) {
-      // Update existing
-      dialogs.value[index] = updatedDialog
-      // Move to top
-      const [item] = dialogs.value.splice(index, 1)
-      dialogs.value.unshift(item)
+      // Update existing - move to top to trigger reactivity
+      dialogs.value = [
+        updatedDialog,
+        ...dialogs.value.filter((_, i) => i !== index)
+      ]
     } else {
-      // Add new to beginning
-      dialogs.value.unshift(updatedDialog)
+      // Add new dialog to beginning
+      dialogs.value = [updatedDialog, ...dialogs.value]
     }
+  }
+
+  const resolveDialogId = (rawDialogId: unknown): string | null => {
+    if (!rawDialogId) return null
+    const rawId = String(rawDialogId)
+    // dialogs is ref<Dialog[]>
+    const exactMatch = dialogs.value.find(dialog => dialog.id === rawId)
+    if (exactMatch) return exactMatch.id
+    const suffixMatch = dialogs.value.find(dialog => dialog.id.endsWith(`:${rawId}`))
+    return suffixMatch?.id ?? rawId
   }
 
   return {
@@ -266,12 +355,14 @@ export const useDialogs = () => {
     createDialog,
     updateDialog,
     deleteDialog,
+    toggleDialogAgentStatus,
     upsertDialog,
     updateDialogStatus,
     updateLastMessage,
     incrementUnread,
     markAsRead,
     getDialogById,
+    resolveDialogId,
     clearDialogs
   }
 }

@@ -23,6 +23,8 @@ export const useAgentWebSocket = (
 ) => {
   const dialogsStore = useDialogs()
   const messagesStore = useMessages()
+  // Use resolveDialogId from dialogs store to avoid duplication
+  const { resolveDialogId } = dialogsStore
 
   // Merge config with defaults
   const reconnectConfig: WsReconnectConfig = {
@@ -35,6 +37,7 @@ export const useAgentWebSocket = (
   const reconnectAttempts = ref(0)
   const currentRunId = ref<string | null>(null)
   const currentDialogId = ref<string | null>(null)
+  const activeDialogId = ref<string | null>(null)
 
   // Internal refs
   let ws: WebSocket | null = null
@@ -83,69 +86,105 @@ export const useAgentWebSocket = (
    */
   const handleMessage = (event: MessageEvent) => {
     try {
-      const message: WsIncomingMessage = JSON.parse(event.data)
-      console.log('[WebSocket] Received:', message.type, message.data)
+      const rawMessage = JSON.parse(event.data)
+      
+      // Standard WebSocket event format: { type: "...", data: {...} }
+      const message: WsIncomingMessage = rawMessage
 
       switch (message.type) {
         case 'message_created': {
-          // New message in dialog - add to messages store
           const msgData = message.data
-          messagesStore.addIncomingMessage({
-            id: msgData.id,
-            dialog_id: msgData.session_id,
-            role: msgData.role,
-            content: msgData.content,
-            created_at: msgData.created_at,
-            user_info: msgData.user_info
+          
+          const rawDialogId = msgData.dialog_id ?? msgData.session_id
+          const dialogId = resolveDialogId(rawDialogId) ?? (rawDialogId ? String(rawDialogId) : null)
+
+          if (!dialogId) {
+            console.warn('[WebSocket] message_created without dialog_id/session_id')
+            break
+          }
+
+          // Skip internal/tool messages — they should not appear in chat or sidebar
+          const msgRole = typeof msgData.role === 'string' ? msgData.role.toLowerCase() : ''
+          const internalRoles = ['tool', 'function', 'tool_result', 'function_result', 'tool_call', 'function_call', 'tool_use']
+          if (internalRoles.includes(msgRole)) break
+          // Also skip when content is a raw object (not string)
+          if (typeof msgData.content === 'object' && msgData.content !== null) break
+
+          const isActiveDialog = dialogId === activeDialogId.value
+
+          // Extract user_info from message data
+          const userInfo = msgData.user_info
+          const platform = userInfo?.platform || (dialogId.startsWith('telegram:') ? 'telegram' : undefined)
+
+          // Safely convert content to string for preview
+          const contentStr = typeof msgData.content === 'string' ? msgData.content : ''
+
+          // Update dialog sidebar
+          dialogsStore.upsertDialog({
+            id: dialogId,
+            session_id: dialogId,
+            last_message_preview: contentStr,
+            last_message_at: msgData.created_at,
+            is_new: !isActiveDialog,
+            platform,
+            user_info: userInfo
           })
+
+          // Match optimistic message or add new
+          const existingMessages = messagesStore.getMessages(dialogId)
+          const pendingMessage = existingMessages.find(m =>
+            m.status === 'sending' &&
+            (m.role === 'user' || m.role === 'manager') &&
+            m.content.trim() === contentStr.trim()
+          )
+
+          if (pendingMessage) {
+            messagesStore.markMessageSent(dialogId, pendingMessage.id, msgData.id)
+          } else {
+            messagesStore.addIncomingMessage({ ...msgData, dialog_id: dialogId })
+          }
+
+          if (isActiveDialog) {
+            dialogsStore.markAsRead(dialogId)
+          }
           break
         }
 
         case 'dialog_updated': {
-          // Dialog list update
           dialogsStore.upsertDialog(message.data)
           break
         }
 
         case 'run_start': {
-          // Agent started processing - create placeholder message
           const { run_id, dialog_id } = message.data
+          const resolvedDialogId = resolveDialogId(dialog_id) ?? dialog_id
           currentRunId.value = run_id
-          currentDialogId.value = dialog_id
+          currentDialogId.value = resolvedDialogId
 
-          // Create streaming placeholder for agent response
-          const agentMessageId = `agent-${run_id}`
-          messagesStore.addMessage(dialog_id, {
-            id: agentMessageId,
-            dialog_id,
-            role: 'agent',
-            type: 'text',
-            content: '',
-            status: 'streaming',
-            created_at: new Date().toISOString()
-          })
-
-          // Update dialog status
-          dialogsStore.updateDialogStatus(dialog_id, 'IN_PROGRESS')
+          messagesStore.handleRunStart(run_id, resolvedDialogId)
+          dialogsStore.updateDialogStatus(resolvedDialogId, 'IN_PROGRESS')
           break
         }
 
         case 'run_result': {
-          // Agent completed - update message with result
-          const { run_id, output, dialog_id, tokens, tools_called } = message.data
-          const agentMessageId = `agent-${run_id}`
+          const { run_id, output, dialog_id } = message.data
+          const resolvedDialogId = resolveDialogId(dialog_id) ?? dialog_id
+          const isActiveDialog = resolvedDialogId === activeDialogId.value
 
-          // Update the streaming message with final content
-          messagesStore.updateMessage(dialog_id, agentMessageId, {
-            content: output,
-            status: 'done'
+          messagesStore.handleRunResult(run_id, resolvedDialogId, output)
+
+          dialogsStore.upsertDialog({
+            id: resolvedDialogId,
+            last_message_preview: output.slice(0, 100),
+            last_message_at: new Date().toISOString(),
+            is_new: !isActiveDialog
           })
+          dialogsStore.updateDialogStatus(resolvedDialogId, 'NORMAL')
 
-          // Update dialog preview
-          dialogsStore.updateLastMessage(dialog_id, output.slice(0, 100), new Date().toISOString())
-          dialogsStore.updateDialogStatus(dialog_id, 'NORMAL')
+          if (isActiveDialog) {
+            dialogsStore.markAsRead(resolvedDialogId)
+          }
 
-          // Reset run tracking
           if (currentRunId.value === run_id) {
             currentRunId.value = null
             currentDialogId.value = null
@@ -154,26 +193,12 @@ export const useAgentWebSocket = (
         }
 
         case 'run_error': {
-          // Agent error - handle gracefully
           const { run_id, error, dialog_id } = message.data
-          const agentMessageId = `agent-${run_id}`
+          const resolvedDialogId = resolveDialogId(dialog_id) ?? dialog_id
 
-          // Remove the failed streaming message or mark as error
-          const messages = messagesStore.getMessages(dialog_id)
-          const msgIndex = messages.findIndex(m => m.id === agentMessageId)
-          
-          if (msgIndex !== -1) {
-            // Remove failed message
-            messagesStore.updateMessage(dialog_id, agentMessageId, {
-              content: `Ошибка: ${error}`,
-              status: 'failed',
-              error_message: error
-            })
-          }
+          messagesStore.handleRunError(run_id, resolvedDialogId, error)
+          dialogsStore.updateDialogStatus(resolvedDialogId, 'ERROR')
 
-          dialogsStore.updateDialogStatus(dialog_id, 'ERROR')
-
-          // Reset run tracking
           if (currentRunId.value === run_id) {
             currentRunId.value = null
             currentDialogId.value = null
@@ -182,7 +207,6 @@ export const useAgentWebSocket = (
         }
 
         case 'ping': {
-          // Respond to ping with pong
           send({ type: 'pong' })
           resetPingTimeout()
           break
@@ -193,20 +217,10 @@ export const useAgentWebSocket = (
           break
         }
 
-        case 'status': {
-          console.log('[WebSocket] Status:', message.data)
+        case 'status':
+        case 'dialog_joined':
+        case 'dialog_left':
           break
-        }
-
-        case 'dialog_joined': {
-          console.log('[WebSocket] Joined dialog:', message.data.dialog_id)
-          break
-        }
-
-        case 'dialog_left': {
-          console.log('[WebSocket] Left dialog:', message.data.dialog_id)
-          break
-        }
 
         default: {
           console.warn('[WebSocket] Unknown message type:', (message as any).type)
@@ -246,7 +260,6 @@ export const useAgentWebSocket = (
       reconnectConfig.maxDelay
     )
 
-    console.log(`[WebSocket] Reconnecting in ${delay}ms (attempt ${reconnectAttempts.value + 1}/${reconnectConfig.maxAttempts})`)
 
     reconnectTimeout = setTimeout(() => {
       reconnectAttempts.value++
@@ -270,21 +283,18 @@ export const useAgentWebSocket = (
     const url = getWebSocketUrl(id)
     if (!url) return
 
-    console.log(`[WebSocket] Connecting to ${url.replace(/token=.*/, 'token=***')}`)
     connectionState.value = 'connecting'
 
     try {
       ws = new WebSocket(url)
 
       ws.onopen = () => {
-        console.log('[WebSocket] Connected')
         connectionState.value = 'connected'
         reconnectAttempts.value = 0
         resetPingTimeout()
       }
 
       ws.onclose = (event) => {
-        console.log(`[WebSocket] Closed (code: ${event.code}, reason: ${event.reason})`)
         connectionState.value = 'disconnected'
 
         if (pingTimeout) {
@@ -329,10 +339,11 @@ export const useAgentWebSocket = (
     }
 
     if (ws) {
-      console.log('[WebSocket] Disconnecting')
       ws.close(1000, 'Client closed')
       ws = null
     }
+
+    activeDialogId.value = null
 
     if (clearReconnect) {
       connectionState.value = 'disconnected'
@@ -368,20 +379,28 @@ export const useAgentWebSocket = (
    * Join a dialog (subscribe to updates)
    */
   const joinDialog = (dialogId: string): boolean => {
-    return send({
+    const joined = send({
       type: 'join_dialog',
       dialog_id: dialogId
     })
+    if (joined) {
+      activeDialogId.value = dialogId
+    }
+    return joined
   }
 
   /**
    * Leave a dialog (unsubscribe)
    */
   const leaveDialog = (dialogId: string): boolean => {
-    return send({
+    const left = send({
       type: 'leave_dialog',
       dialog_id: dialogId
     })
+    if (left && activeDialogId.value === dialogId) {
+      activeDialogId.value = null
+    }
+    return left
   }
 
   /**

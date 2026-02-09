@@ -2,23 +2,25 @@
   <div
     class="flex"
     :class="[
-      isAgent ? 'justify-end' : 'justify-start'
+      isOutgoing ? 'justify-end' : 'justify-start'
     ]"
   >
     <div
       class="max-w-[85%] sm:max-w-[70%] lg:max-w-[60%]"
       :class="[
-        isAgent ? 'order-1' : 'order-2'
+        isOutgoing ? 'order-1' : 'order-2'
       ]"
     >
       <!-- Sender Label -->
       <div
         class="text-[11px] font-medium mb-1 px-1"
         :class="[
-          isAgent ? 'text-right text-indigo-600' : 'text-left text-slate-500'
+          isManager ? 'text-right text-emerald-600'
+            : isAgent ? 'text-right text-indigo-600'
+            : 'text-left text-slate-500'
         ]"
       >
-        {{ isAgent ? 'Агент' : 'Пользователь' }}
+        {{ isManager ? 'Менеджер' : isAgent ? 'Агент' : 'Пользователь' }}
       </div>
 
       <!-- Message Bubble -->
@@ -31,7 +33,7 @@
           <div
             class="text-sm whitespace-pre-wrap break-words prose prose-sm max-w-none"
             :class="[
-              isAgent ? 'prose-invert' : ''
+              isOutgoing ? 'prose-invert' : ''
             ]"
             v-html="renderedContent"
           />
@@ -54,7 +56,7 @@
               @click="togglePlay"
               class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors"
               :class="[
-                isAgent
+                isOutgoing
                   ? 'bg-white/20 hover:bg-white/30 text-white'
                   : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
               ]"
@@ -68,13 +70,13 @@
               <div
                 class="h-1 rounded-full overflow-hidden"
                 :class="[
-                  isAgent ? 'bg-white/30' : 'bg-slate-300'
+                  isOutgoing ? 'bg-white/30' : 'bg-slate-300'
                 ]"
               >
                 <div
                   class="h-full transition-all"
                   :class="[
-                    isAgent ? 'bg-white' : 'bg-slate-600'
+                    isOutgoing ? 'bg-white' : 'bg-slate-600'
                   ]"
                   :style="{ width: `${playProgress}%` }"
                 />
@@ -84,7 +86,7 @@
               <span
                 class="text-xs mt-1 block"
                 :class="[
-                  isAgent ? 'text-white/70' : 'text-slate-500'
+                  isOutgoing ? 'text-white/70' : 'text-slate-500'
                 ]"
               >
                 {{ formattedDuration }}
@@ -103,7 +105,7 @@
       <div
         class="flex items-center gap-2 mt-1 px-1"
         :class="[
-          isAgent ? 'justify-end' : 'justify-start'
+          isOutgoing ? 'justify-end' : 'justify-start'
         ]"
       >
         <!-- Time -->
@@ -111,8 +113,8 @@
           {{ formattedTime }}
         </span>
 
-        <!-- Status (agent messages only) -->
-        <template v-if="isAgent">
+        <!-- Status (outgoing messages: agent + manager) -->
+        <template v-if="isOutgoing">
           <!-- Sending -->
           <Loader2
             v-if="message.status === 'sending'"
@@ -173,11 +175,12 @@ const audioRef = ref<HTMLAudioElement | null>(null)
 
 // Computed
 const isAgent = computed(() => props.message.role === 'agent')
+const isManager = computed(() => props.message.role === 'manager')
+const isOutgoing = computed(() => isAgent.value || isManager.value)
 
 const bubbleClasses = computed(() => {
-  if (isAgent.value) {
-    return 'bg-indigo-600 text-white rounded-br-sm'
-  }
+  if (isManager.value) return 'bg-emerald-600 text-white rounded-br-sm'
+  if (isAgent.value) return 'bg-indigo-600 text-white rounded-br-sm'
   return 'bg-white border border-slate-200 text-slate-900 rounded-bl-sm shadow-sm'
 })
 

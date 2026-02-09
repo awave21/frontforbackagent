@@ -42,17 +42,6 @@
               <!-- Табы для разных способов входа -->
               <div class="flex mb-6 bg-slate-100 rounded-lg p-1">
                 <button
-                  @click="authMethod = 'register'"
-                  :class="[
-                    'flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors',
-                    authMethod === 'register'
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900'
-                  ]"
-                >
-                  Регистрация
-                </button>
-                <button
                   @click="authMethod = 'login'"
                   :class="[
                     'flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors',
@@ -62,6 +51,17 @@
                   ]"
                 >
                   Вход
+                </button>
+                <button
+                  @click="authMethod = 'register'"
+                  :class="[
+                    'flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors',
+                    authMethod === 'register'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  ]"
+                >
+                  Регистрация
                 </button>
               </div>
 
@@ -273,7 +273,7 @@ const { error: showError, success: showSuccess } = useToast()
 const validationErrors = ref<Record<string, string[]>>({})
 
 // Метод аутентификации
-const authMethod = ref<'register' | 'login'>('register')
+const authMethod = ref<'register' | 'login'>('login')
 const loginForm = ref({
   email: '',
   password: ''
@@ -425,7 +425,7 @@ watch(() => props.isOpen, (isOpen) => {
     showPassword.value = false
     showConfirmPassword.value = false
     showLoginPassword.value = false
-    authMethod.value = 'register'
+    authMethod.value = 'login'
   }
 })
 </script>
