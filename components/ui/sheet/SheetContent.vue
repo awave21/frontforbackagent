@@ -40,8 +40,8 @@ const forwarded = useForwardPropsEmits(props, emits)
 
 const sideClasses = computed(() => {
   const base: Record<SheetSide, string> = {
-    right: 'right-0 top-0 bottom-0 w-full max-w-md data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right',
-    left: 'left-0 top-0 bottom-0 w-full max-w-md data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left',
+    right: 'right-0 top-0 bottom-0 w-full data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right',
+    left: 'left-0 top-0 bottom-0 w-full data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left',
     top: 'top-0 left-0 right-0 data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top',
     bottom: 'bottom-0 left-0 right-0 data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',
   }

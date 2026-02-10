@@ -13,14 +13,15 @@
           :loading="directoryItemsLoading"
           @back="handleBackToList"
           @settings="showDirectorySettingsSheet = true"
-          @add="showItemFormModal = true; editingItem = null"
           @create="handleCreateItem"
           @update="handleUpdateItem"
-          @edit="(item: any) => { editingItem = item; showItemFormModal = true }"
           @delete="handleDeleteItem"
           @delete-selected="handleDeleteSelectedItems"
           @import="showImportCsvModal = true"
           @export="handleExportCsv"
+          @add-column="handleAddColumn"
+          @delete-column="handleDeleteColumn"
+          @update-columns="handleUpdateColumns"
         />
       </div>
       <div v-else>
@@ -73,16 +74,6 @@
       @submit="handleCreateDirectory"
     />
 
-    <ItemFormModal
-      v-if="selectedDirectory"
-      :is-open="showItemFormModal"
-      :directory-name="selectedDirectory.name"
-      :columns="selectedDirectory.columns"
-      :edit-item="editingItem"
-      @close="showItemFormModal = false; editingItem = null"
-      @submit="handleSaveItem"
-    />
-
     <ImportCsvModal
       v-if="selectedDirectory"
       :is-open="showImportCsvModal"
@@ -116,7 +107,6 @@ import KnowledgeSubTabs from '~/components/knowledge/KnowledgeSubTabs.vue'
 import DirectoriesList from '~/components/knowledge/DirectoriesList.vue'
 import DirectoryDetail from '~/components/knowledge/DirectoryDetail.vue'
 import CreateDirectoryModal from '~/components/knowledge/CreateDirectoryModal.vue'
-import ItemFormModal from '~/components/knowledge/ItemFormModal.vue'
 import ImportCsvModal from '~/components/knowledge/ImportCsvModal.vue'
 import DirectorySettingsSheet from '~/components/knowledge/DirectorySettingsSheet.vue'
 import SQNSIntegrationManager from '~/components/SQNSIntegrationManager.vue'
@@ -127,10 +117,8 @@ const { success: toastSuccess, error: toastError } = useToast()
 
 const knowledgeSubTab = ref<'sqns' | 'directories'>('directories')
 const showCreateDirectoryModal = ref(false)
-const showItemFormModal = ref(false)
 const showImportCsvModal = ref(false)
 const showDirectorySettingsSheet = ref(false)
-const editingItem = ref<any | null>(null)
 const directorySettingsSheetRef = ref<InstanceType<typeof DirectorySettingsSheet> | null>(null)
 
 const directories = computed(() => directoriesComposable.value?.directories ?? [])
@@ -200,23 +188,6 @@ const handleBackToList = () => {
   }
 }
 
-const handleSaveItem = async (data: Record<string, any>, itemId?: string) => {
-  if (!directoriesComposable.value || !selectedDirectory.value) return
-  try {
-    if (itemId) {
-      await directoriesComposable.value.updateItem(selectedDirectory.value.id, itemId, data)
-      toastSuccess('Запись обновлена')
-    } else {
-      await directoriesComposable.value.createItem(selectedDirectory.value.id, data)
-      toastSuccess('Запись добавлена')
-    }
-    showItemFormModal.value = false
-    editingItem.value = null
-  } catch (err: any) {
-    toastError(err.message || 'Не удалось сохранить запись')
-  }
-}
-
 const handleCreateItem = async (data: Record<string, any>) => {
   if (!directoriesComposable.value || !selectedDirectory.value) return
   try {
@@ -273,6 +244,47 @@ const handleExportCsv = async () => {
     await directoriesComposable.value.exportCsv(selectedDirectory.value.id)
   } catch (err: any) {
     toastError(err.message || 'Не удалось экспортировать справочник')
+  }
+}
+
+const handleAddColumn = async (column: any) => {
+  if (!directoriesComposable.value || !selectedDirectory.value) return
+  try {
+    const updatedColumns = [...selectedDirectory.value.columns, column]
+    await directoriesComposable.value.updateDirectory(selectedDirectory.value.id, {
+      columns: updatedColumns
+    })
+    toastSuccess('Столбец добавлен')
+  } catch (err: any) {
+    toastError(err.message || 'Не удалось добавить столбец')
+  }
+}
+
+const handleDeleteColumn = async (columnName: string) => {
+  if (!directoriesComposable.value || !selectedDirectory.value) return
+  try {
+    const updatedColumns = selectedDirectory.value.columns.filter(c => c.name !== columnName)
+    if (updatedColumns.length === 0) {
+      toastError('Нельзя удалить последний столбец')
+      return
+    }
+    await directoriesComposable.value.updateDirectory(selectedDirectory.value.id, {
+      columns: updatedColumns
+    })
+    toastSuccess('Столбец удалён')
+  } catch (err: any) {
+    toastError(err.message || 'Не удалось удалить столбец')
+  }
+}
+
+const handleUpdateColumns = async (columns: any[]) => {
+  if (!directoriesComposable.value || !selectedDirectory.value) return
+  try {
+    await directoriesComposable.value.updateDirectory(selectedDirectory.value.id, {
+      columns
+    })
+  } catch (err: any) {
+    toastError(err.message || 'Не удалось обновить столбцы')
   }
 }
 

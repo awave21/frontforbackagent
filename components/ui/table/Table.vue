@@ -1,5 +1,5 @@
 <template>
-  <div :class="['overflow-hidden rounded-2xl border border-slate-200', wrapperClass]">
+  <div :class="['overflow-x-auto rounded-md border border-slate-200', wrapperClass]">
     <table
       class="min-w-full divide-y divide-slate-100 text-left"
       v-bind="attrs"

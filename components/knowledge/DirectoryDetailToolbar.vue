@@ -7,7 +7,7 @@
         class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <Plus class="w-4 h-4" />
-        {{ addDisabled ? 'Заполните строку' : 'Добавить' }}
+        Добавить
       </button>
       <button
         @click="$emit('import')"

@@ -1,6 +1,6 @@
 <template>
   <Sheet :open="isOpen" @update:open="(v) => !v && handleClose()">
-    <SheetContent side="right" class-name="max-w-xl">
+    <SheetContent side="right" class-name="max-w-4xl flex flex-col">
       <!-- Header -->
       <SheetHeader>
         <div class="flex items-center justify-between">
@@ -9,184 +9,133 @@
         </div>
       </SheetHeader>
 
-      <!-- Content -->
+      <!-- Content (scrollable) -->
       <div class="flex-1 overflow-y-auto p-6 space-y-6">
         <!-- Basic Info -->
-        <div>
-          <label class="text-sm font-medium text-slate-700">Название</label>
-          <input
-            v-model.trim="form.name"
-            type="text"
-            class="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all"
-          />
-        </div>
-
-        <div>
-          <label class="text-sm font-medium text-slate-700">Имя функции</label>
-          <input
-            v-model.trim="form.tool_name"
-            type="text"
-            class="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 font-mono focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all"
-            :class="{ 'border-yellow-300 bg-yellow-50': toolNameChanged }"
-          />
-          <p v-if="toolNameChanged" class="mt-1 text-xs text-yellow-600">
-            Изменение повлияет на промпт агента
-          </p>
-          <p v-if="toolNameError" class="mt-1 text-xs text-red-600">{{ toolNameError }}</p>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="text-sm font-medium text-slate-700">Название</label>
+            <input
+              v-model.trim="form.name"
+              type="text"
+              class="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all"
+            />
+          </div>
+          <div>
+            <label class="text-sm font-medium text-slate-700">Имя функции</label>
+            <input
+              v-model.trim="form.tool_name"
+              type="text"
+              class="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 font-mono focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all"
+              :class="{ 'border-yellow-300 bg-yellow-50': toolNameChanged }"
+            />
+            <p v-if="toolNameChanged" class="mt-1 text-xs text-yellow-600">
+              Изменение повлияет на промпт агента
+            </p>
+            <p v-if="toolNameError" class="mt-1 text-xs text-red-600">{{ toolNameError }}</p>
+          </div>
         </div>
 
         <div>
           <label class="text-sm font-medium text-slate-700">Описание для агента</label>
           <textarea
             v-model.trim="form.tool_description"
-            rows="3"
-            class="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all resize-none"
+            rows="2"
+            class="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all resize-none"
           ></textarea>
         </div>
 
         <!-- Columns Section -->
-        <div class="border-t border-slate-100 pt-6">
-          <div class="flex items-center justify-between mb-4">
+        <div class="border-t border-slate-100 pt-5">
+          <div class="flex items-center justify-between mb-3">
             <label class="text-sm font-medium text-slate-700">Колонки справочника</label>
-            <div class="flex items-center gap-2">
-              <span v-if="hasColumnsChanges" class="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-lg">
-                Изменения не сохранены
-              </span>
-              <button
-                type="button"
-                @click="showColumnsEditor = !showColumnsEditor"
-                class="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
-              >
-                {{ showColumnsEditor ? 'Свернуть' : 'Редактировать' }}
-              </button>
-            </div>
-          </div>
-
-          <!-- Columns Preview (collapsed) -->
-          <div v-if="!showColumnsEditor" class="flex flex-wrap gap-2">
-            <span
-              v-for="col in form.columns"
-              :key="col.name"
-              class="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600"
-            >
-              {{ col.label }}
-              <span class="text-slate-400 ml-1">({{ col.type }})</span>
-              <span v-if="col.required" class="text-red-400 ml-0.5">*</span>
+            <span v-if="hasColumnsChanges" class="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-lg">
+              Изменения не сохранены
             </span>
           </div>
 
-          <!-- Columns Editor (expanded) -->
-          <div v-else class="space-y-3">
-            <ColumnEditor
-              v-model="editorColumns"
-              :max-columns="15"
-              ref="columnEditorRef"
-            />
-            <p v-if="columnsWarning" class="text-xs text-amber-600 bg-amber-50 p-3 rounded-lg">
-              {{ columnsWarning }}
-            </p>
-          </div>
+          <ColumnEditor
+            v-model="editorColumns"
+            :max-columns="15"
+            ref="columnEditorRef"
+          />
+          <p v-if="columnsWarning" class="mt-2 text-xs text-amber-600 bg-amber-50 p-3 rounded-lg">
+            {{ columnsWarning }}
+          </p>
         </div>
 
-        <!-- Response Mode -->
-        <div class="border-t border-slate-100 pt-6">
-          <label class="text-sm font-medium text-slate-700 mb-3 block">Режим ответа</label>
-          <div class="space-y-3">
-            <label 
-              class="flex items-start gap-3 p-4 rounded-md border cursor-pointer transition-all"
-              :class="[
-                form.response_mode === 'function_result'
-                  ? 'border-indigo-300 bg-indigo-50'
-                  : 'border-slate-200 hover:border-slate-300'
-              ]"
-            >
-              <input
+        <!-- Settings Columns -->
+        <div class="border-t border-slate-100 pt-5">
+          <div class="flex items-start gap-6">
+            <!-- Response Mode -->
+            <div class="flex-1">
+              <label class="text-xs font-medium text-slate-500 mb-1.5 block">Режим ответа</label>
+              <select
                 v-model="form.response_mode"
-                type="radio"
-                value="function_result"
-                class="mt-0.5 w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500"
-              />
-              <div>
-                <span class="font-medium text-slate-900 text-sm">Результат функции</span>
-                <p class="text-xs text-slate-500 mt-0.5">
-                  Агент получит данные и сформулирует ответ самостоятельно
-                </p>
-              </div>
-            </label>
-            
-            <label 
-              class="flex items-start gap-3 p-4 rounded-md border cursor-pointer transition-all"
-              :class="[
-                form.response_mode === 'direct_message'
-                  ? 'border-indigo-300 bg-indigo-50'
-                  : 'border-slate-200 hover:border-slate-300'
-              ]"
-            >
-              <input
-                v-model="form.response_mode"
-                type="radio"
-                value="direct_message"
-                class="mt-0.5 w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500"
-              />
-              <div>
-                <span class="font-medium text-slate-900 text-sm">Прямое сообщение</span>
-                <p class="text-xs text-slate-500 mt-0.5">
-                  Ответ отправится пользователю напрямую без обработки
-                </p>
-              </div>
-            </label>
-          </div>
-        </div>
-
-        <!-- Search Type -->
-        <div class="border-t border-slate-100 pt-6">
-          <label class="text-sm font-medium text-slate-700 mb-3 block">Тип поиска</label>
-          <select
-            v-model="form.search_type"
-            class="w-full rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all"
-          >
-            <option value="exact">Точный — совпадение ключевых слов</option>
-            <option value="fuzzy">Нечёткий — учитывает опечатки</option>
-            <option value="semantic">Семантический — поиск по смыслу</option>
-          </select>
-        </div>
-
-        <!-- Enabled Toggle -->
-        <div class="border-t border-slate-100 pt-6">
-          <label class="flex items-center justify-between cursor-pointer">
-            <div>
-              <span class="font-medium text-slate-900 text-sm">Справочник активен</span>
-              <p class="text-xs text-slate-500 mt-0.5">
-                Агент сможет использовать этот справочник
+                class="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all"
+              >
+                <option value="function_result">Результат функции</option>
+                <option value="direct_message">Прямое сообщение</option>
+              </select>
+              <p class="mt-1 text-xs text-slate-400">
+                {{ form.response_mode === 'function_result' ? 'Агент сформулирует ответ сам' : 'Без обработки агентом' }}
               </p>
             </div>
-            <Switch
-              v-model="form.is_enabled"
-            />
-          </label>
+
+            <!-- Search Type -->
+            <div class="flex-1">
+              <label class="text-xs font-medium text-slate-500 mb-1.5 block">Тип поиска</label>
+              <select
+                v-model="form.search_type"
+                class="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all"
+              >
+                <option value="exact">Точный</option>
+                <option value="fuzzy">Нечёткий</option>
+                <option value="semantic">Семантический</option>
+              </select>
+            </div>
+
+            <!-- Enabled Toggle -->
+            <div class="w-40 shrink-0">
+              <label class="text-xs font-medium text-slate-500 mb-1.5 block">Статус</label>
+              <label class="flex items-center gap-3 cursor-pointer px-3 py-2 rounded-md border border-slate-200 hover:border-slate-300 transition-all">
+                <Switch v-model="form.is_enabled" />
+                <span class="text-sm text-slate-700">{{ form.is_enabled ? 'Активен' : 'Выключен' }}</span>
+              </label>
+            </div>
+          </div>
         </div>
 
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
       </div>
 
-      <!-- Footer -->
-      <SheetFooter class-name="space-y-3">
-        <button
-          @click="handleSave"
-          class="w-full px-6 py-3 bg-indigo-600 text-white rounded-md text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-          :disabled="isSaving || !isValid"
-        >
-          <Loader2 v-if="isSaving" class="w-4 h-4 animate-spin" />
-          <span>{{ isSaving ? 'Сохранение...' : 'Сохранить' }}</span>
-        </button>
-        
-        <button
-          @click="showDeleteConfirm = true"
-          class="w-full px-6 py-3 bg-white border border-red-200 text-red-600 rounded-md text-sm font-medium hover:bg-red-50 transition-colors"
-        >
-          Удалить справочник
-        </button>
-      </SheetFooter>
+      <!-- Sticky Footer -->
+      <div class="flex-shrink-0 border-t border-slate-200 bg-white px-6 py-3">
+        <div class="flex items-center justify-between">
+          <button
+            @click="showDeleteConfirm = true"
+            class="px-3 py-1.5 text-sm text-red-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+          >
+            Удалить
+          </button>
+          <div class="flex items-center gap-2">
+            <button
+              @click="handleClose"
+              class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+            >
+              Отмена
+            </button>
+            <button
+              @click="handleSave"
+              class="px-5 py-2 bg-indigo-600 text-white rounded-md text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+              :disabled="isSaving || !isValid"
+            >
+              <Loader2 v-if="isSaving" class="w-3.5 h-3.5 animate-spin" />
+              {{ isSaving ? 'Сохранение...' : 'Сохранить' }}
+            </button>
+          </div>
+        </div>
+      </div>
 
       <!-- Delete Confirmation Dialog -->
       <Dialog :open="showDeleteConfirm" @update:open="(v) => showDeleteConfirm = v">
@@ -230,9 +179,7 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-  SheetDescription,
   SheetClose,
-  SheetFooter
 } from '~/components/ui/sheet'
 import {
   Dialog,
@@ -271,7 +218,6 @@ const isDeleting = ref(false)
 const error = ref('')
 const toolNameError = ref('')
 const showDeleteConfirm = ref(false)
-const showColumnsEditor = ref(false)
 
 const originalToolName = ref('')
 const originalColumns = ref<DirectoryColumn[]>([])
@@ -304,7 +250,7 @@ const isValid = computed(() => {
   if (toolNameError.value) return false
   if (form.value.columns.length === 0) return false
 
-  if (showColumnsEditor.value && columnEditorRef.value) {
+  if (columnEditorRef.value) {
     return columnEditorRef.value.isValid()
   }
 
@@ -369,7 +315,6 @@ const handleClose = () => {
   error.value = ''
   toolNameError.value = ''
   showDeleteConfirm.value = false
-  showColumnsEditor.value = false
   isSaving.value = false
   isDeleting.value = false
   emit('close')
@@ -405,7 +350,6 @@ watch(() => props.isOpen, (open) => {
     error.value = ''
     toolNameError.value = ''
     showDeleteConfirm.value = false
-    showColumnsEditor.value = false
   }
 })
 

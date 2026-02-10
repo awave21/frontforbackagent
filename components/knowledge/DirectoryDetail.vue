@@ -22,43 +22,91 @@
       </div>
       <button
         @click="$emit('settings')"
-        class="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-        title="Настройки"
+        class="flex items-center gap-2 px-3 py-2 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors text-sm font-medium"
       >
-        <Settings class="w-5 h-5" />
+        <Pencil class="w-4 h-4" />
+        <span>Редактировать</span>
       </button>
     </div>
 
     <!-- Actions Bar -->
     <DirectoryDetailToolbar
-      :add-disabled="isAddingRow"
+      :add-disabled="false"
       :has-items="items.length > 0"
       :selected-count="Object.keys(rowSelection).length"
       :search-query="globalFilter"
-      @add-row="startAddingRow"
+      @add-row="openAddRowSheet"
       @import="$emit('import')"
       @export="$emit('export')"
       @delete-selected="$emit('deleteSelected', selectedRowIds)"
       @update:search-query="globalFilter = $event"
     />
 
-    <!-- Hint for inline editing -->
-    <p v-if="items.length > 0 || isAddingRow" class="text-xs text-slate-400 flex items-center gap-1.5">
-      <span class="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 rounded text-slate-500">
-        <MousePointer class="w-3 h-3" />
-        Клик
-      </span>
-      для редактирования ячейки
-      <span class="mx-1">•</span>
-      <span class="px-1.5 py-0.5 bg-slate-100 rounded text-slate-500 font-mono text-[10px]">Tab</span>
-      следующая
-      <span class="mx-1">•</span>
-      <span class="px-1.5 py-0.5 bg-slate-100 rounded text-slate-500 font-mono text-[10px]">Enter</span>
-      сохранить
-      <span class="mx-1">•</span>
-      <span class="px-1.5 py-0.5 bg-slate-100 rounded text-slate-500 font-mono text-[10px]">Esc</span>
-      отмена
-    </p>
+    <!-- Hint bar: shortcuts + undo/redo + hidden columns -->
+    <div v-if="items.length > 0" class="flex items-center justify-between gap-4 flex-wrap">
+      <p class="text-xs text-slate-400 flex items-center gap-1.5">
+        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 rounded text-slate-500">
+          <MousePointer class="w-3 h-3" />
+          Клик
+        </span>
+        редактирование
+        <span class="mx-0.5">•</span>
+        <span class="px-1.5 py-0.5 bg-slate-100 rounded text-slate-500 font-mono text-[10px]">Tab</span>
+        далее
+        <span class="mx-0.5">•</span>
+        <span class="px-1.5 py-0.5 bg-slate-100 rounded text-slate-500 font-mono text-[10px]">Enter</span>
+        сохранить
+        <span class="mx-0.5">•</span>
+        <span class="px-1.5 py-0.5 bg-slate-100 rounded text-slate-500 font-mono text-[10px]">Esc</span>
+        отмена
+        <span class="mx-0.5">•</span>
+        <span class="px-1.5 py-0.5 bg-slate-100 rounded text-slate-500 font-mono text-[10px]">ПКМ</span>
+        меню
+      </p>
+      <div class="flex items-center gap-2">
+        <!-- Hidden columns badge -->
+        <button
+          v-if="hiddenColumnNames.size > 0"
+          @click="showAllColumns"
+          class="flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors"
+        >
+          <EyeOff class="w-3 h-3" />
+          {{ hiddenColumnNames.size }} скрыто
+          <X class="w-3 h-3 ml-0.5" />
+        </button>
+        <!-- Undo / Redo -->
+        <TooltipProvider :delay-duration="300">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                @click="undo"
+                :disabled="!canUndo"
+                class="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <Undo2 class="w-3.5 h-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p class="text-xs">Отменить <kbd class="ml-1 px-1 py-0.5 bg-slate-700 rounded text-[10px]">Ctrl+Z</kbd></p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                @click="redo"
+                :disabled="!canRedo"
+                class="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <Redo2 class="w-3.5 h-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p class="text-xs">Повторить <kbd class="ml-1 px-1 py-0.5 bg-slate-700 rounded text-[10px]">Ctrl+Shift+Z</kbd></p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+    </div>
 
     <!-- Loading State -->
     <div v-if="loading" class="flex justify-center py-12">
@@ -67,7 +115,7 @@
 
     <!-- Empty State -->
     <div 
-      v-else-if="items.length === 0 && !globalFilter && !isAddingRow" 
+      v-else-if="items.length === 0 && !globalFilter" 
       class="bg-background rounded-md border border-border p-12 text-center"
     >
       <div class="max-w-md mx-auto">
@@ -80,7 +128,7 @@
         </p>
         <div class="flex items-center justify-center gap-3">
           <button
-            @click="startAddingRow"
+            @click="openAddRowSheet"
             class="px-5 py-2.5 bg-indigo-600 text-white rounded-md text-sm font-bold hover:bg-indigo-700 transition-colors"
           >
             Добавить запись
@@ -97,15 +145,14 @@
 
     <!-- No Results -->
     <div 
-      v-else-if="table.getRowModel().rows.length === 0 && globalFilter && !isAddingRow" 
+      v-else-if="table.getRowModel().rows.length === 0 && globalFilter" 
       class="bg-background rounded-md border border-border p-8 text-center"
     >
       <p class="text-slate-500">Ничего не найдено по запросу "{{ globalFilter }}"</p>
     </div>
 
     <!-- Table with TanStack -->
-    <div v-else-if="table.getRowModel().rows.length > 0 || isAddingRow" class="shadow-sm overflow-hidden">
-      <div class="overflow-x-auto">
+    <div v-else-if="table.getRowModel().rows.length > 0" class="shadow-sm">
         <Table>
           <TableHeader>
             <TableRow>
@@ -121,23 +168,25 @@
               <TableHead
                 v-for="header in table.getHeaderGroups()[0].headers.filter(h => h.id !== 'select' && h.id !== 'actions')" 
                 :key="header.id"
-                draggable="true"
-                @dragstart="handleDragStart($event, header.index - 1)"
                 @dragover.prevent="handleDragOver($event, header.index - 1)"
                 @dragenter.prevent="dragOverIndex = header.index - 1"
                 @dragleave="handleDragLeave"
                 @drop="handleDrop($event, header.index - 1)"
                 @dragend="handleDragEnd"
-                :class-name="`cursor-grab select-none transition-all ${dragOverIndex === header.index - 1 && dragIndex !== header.index - 1 ? 'bg-indigo-100 scale-105' : ''} ${dragIndex === header.index - 1 ? 'opacity-50' : ''}`"
+                :class-name="`select-none transition-all ${dragOverIndex === header.index - 1 && dragIndex !== header.index - 1 ? 'bg-indigo-100 scale-105' : ''} ${dragIndex === header.index - 1 ? 'opacity-50' : ''}`"
                 :style="{ minWidth: getColumnWidth(header.column.columnDef.meta as any) }"
               >
-                <div class="flex items-center gap-1.5">
-                  <GripVertical class="w-3 h-3 text-slate-400" />
-                  <FlexRender :render="header.column.columnDef.header" :props="header.getContext()" />
-                </div>
+                <ColumnHeaderDropdown
+                  :column="header.column.columnDef.meta as any"
+                  :is-only-column="columns.length <= 1"
+                  @dragstart="handleDragStart($event, header.index - 1)"
+                  @edit="openColumnSettings(header.column.columnDef.meta as any)"
+                  @hide="hideColumn(header.column.columnDef.meta as any)"
+                  @delete="deleteColumn(header.column.columnDef.meta as any)"
+                />
               </TableHead>
               <!-- Add Column Button -->
-              <InlineAddColumn
+              <AddColumnPopover
                 :existing-columns="columns"
                 @add="(col) => $emit('addColumn', col)"
               />
@@ -145,68 +194,62 @@
             </TableRow>
           </TableHeader>
           <TableBody>
-            <!-- New Row (inline add) -->
-            <InlineNewRow 
-              v-if="isAddingRow"
-              ref="newRowRef"
-              :columns="orderedColumns"
-              :row-data="newRowData"
-              :saving="isSavingNewRow"
-              @update:field="(name, val) => newRowData[name] = val"
-              @save="saveNewRow"
-              @cancel="cancelNewRow"
-            />
             <!-- Data Rows -->
-            <TableRow 
-              v-for="row in table.getRowModel().rows" 
+            <RowContextMenu
+              v-for="row in table.getRowModel().rows"
               :key="row.id"
-              class="group"
-              :class="{ 'bg-indigo-50/30': editingCell?.itemId === row.original.id }"
+              @edit="startEditRow(row.original)"
+              @duplicate="duplicateRow(row.original)"
+              @delete="$emit('delete', row.original.id)"
             >
-              <TableCell class-name="px-4 py-2">
-                <input
-                  type="checkbox"
-                  :checked="row.getIsSelected()"
-                  @change="row.toggleSelected()"
-                  class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                />
-              </TableCell>
-              <TableCell 
-                v-for="col in orderedColumns" 
-                :key="col.name"
-                class-name="px-1 py-1"
-                :style="{ minWidth: getColumnWidth(col) }"
+              <TableRow 
+                class="group"
+                :class="{ 'bg-indigo-50/30': editingCell?.itemId === row.original.id }"
               >
-                <EditableCell
-                  :column="col"
-                  :display-value="row.original.data[col.name]"
-                  :model-value="editingCell?.itemId === row.original.id && editingCell?.colName === col.name ? editValue : row.original.data[col.name]"
-                  :editing="isEditing(row.original.id, col.name)"
-                  :saving="isSaving"
-                  @update:model-value="editValue = $event"
-                  @start-edit="startEdit(row.original, col)"
-                  @blur="handleBlur"
-                  @keydown="(e) => handleKeydown(e, row.original, col, row.index, orderedColumns.indexOf(col))"
-                  @save="saveEdit"
-                />
-              </TableCell>
-              <!-- Empty cell for add column -->
-              <TableCell class-name="px-2 py-2 w-40"></TableCell>
-              <TableCell class-name="px-4 py-2 w-16">
-                <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    @click="$emit('delete', row.original.id)"
-                    class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Удалить"
-                  >
-                    <Trash2 class="w-4 h-4" />
-                  </button>
-                </div>
-              </TableCell>
-            </TableRow>
+                <TableCell class-name="px-4 py-2">
+                  <input
+                    type="checkbox"
+                    :checked="row.getIsSelected()"
+                    @change="row.toggleSelected()"
+                    class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                </TableCell>
+                <TableCell 
+                  v-for="col in orderedColumns" 
+                  :key="col.name"
+                  class-name="px-1 py-1"
+                  :style="{ minWidth: getColumnWidth(col) }"
+                >
+                  <EditableCell
+                    :column="col"
+                    :display-value="row.original.data[col.name]"
+                    :model-value="editingCell?.itemId === row.original.id && editingCell?.colName === col.name ? editValue : row.original.data[col.name]"
+                    :editing="isEditing(row.original.id, col.name)"
+                    :saving="isSaving"
+                    @update:model-value="editValue = $event"
+                    @start-edit="startEdit(row.original, col)"
+                    @blur="handleBlur"
+                    @keydown="(e) => handleKeydown(e, row.original, col, row.index, orderedColumns.indexOf(col))"
+                    @save="saveEdit"
+                  />
+                </TableCell>
+                <!-- Empty cell for add column -->
+                <TableCell class-name="px-2 py-2 w-40"></TableCell>
+                <TableCell class-name="px-4 py-2 w-16">
+                  <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      @click="$emit('delete', row.original.id)"
+                      class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Удалить"
+                    >
+                      <Trash2 class="w-4 h-4" />
+                    </button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            </RowContextMenu>
           </TableBody>
         </Table>
-      </div>
 
       <!-- Pagination -->
       <div v-if="table.getPageCount() > 1" class="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-slate-50">
@@ -244,39 +287,53 @@
         </div>
       </div>
     </div>
+
+    <!-- Add Row Side Panel -->
+    <AddRowSheet
+      :open="isAddRowSheetOpen"
+      :columns="orderedColumns"
+      :saving="isSavingNewRow"
+      @update:open="isAddRowSheetOpen = $event"
+      @save="handleSheetSave"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import {
   useVueTable,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
-  FlexRender,
   type ColumnDef,
 } from '@tanstack/vue-table'
 import {
   ArrowLeft,
-  Settings,
+  Pencil,
   Loader2,
   FileText,
   ChevronLeft,
   ChevronRight,
   MousePointer,
-  GripVertical,
-  Trash2
+  Trash2,
+  Undo2,
+  Redo2,
+  EyeOff,
+  X
 } from 'lucide-vue-next'
 import type { Directory, DirectoryItem, DirectoryColumn } from '~/types/directories'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '~/components/ui/table'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '~/components/ui/tooltip'
 import { pluralize } from '~/utils/pluralize'
 import { getColumnWidth as getColWidth } from '~/utils/directory-helpers'
 
 import DirectoryDetailToolbar from './DirectoryDetailToolbar.vue'
 import EditableCell from './EditableCell.vue'
-import InlineNewRow from './InlineNewRow.vue'
-import InlineAddColumn from './InlineAddColumn.vue'
+import AddColumnPopover from './AddColumnPopover.vue'
+import ColumnHeaderDropdown from './ColumnHeaderDropdown.vue'
+import RowContextMenu from './RowContextMenu.vue'
+import AddRowSheet from './AddRowSheet.vue'
 
 const props = defineProps<{
   directory: Directory
@@ -287,15 +344,15 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'back'): void
   (e: 'settings'): void
-  (e: 'add'): void
   (e: 'import'): void
   (e: 'export'): void
-  (e: 'edit', item: DirectoryItem): void
   (e: 'update', itemId: string, data: Record<string, any>): void
   (e: 'create', data: Record<string, any>): void
   (e: 'delete', id: string): void
   (e: 'deleteSelected', ids: string[]): void
   (e: 'addColumn', column: DirectoryColumn & { searchable: boolean }): void
+  (e: 'deleteColumn', columnName: string): void
+  (e: 'updateColumns', columns: DirectoryColumn[]): void
 }>()
 
 // --- Inline editing state ---
@@ -304,17 +361,34 @@ const editValue = ref<any>('')
 const originalValue = ref<any>('')
 const isSaving = ref(false)
 
-// --- Inline new row state ---
-const isAddingRow = ref(false)
-const newRowData = ref<Record<string, any>>({})
+// --- Undo/Redo history ---
+type EditHistoryEntry = {
+  itemId: string
+  colName: string
+  oldValue: any
+  newValue: any
+  timestamp: number
+}
+const editHistory = ref<EditHistoryEntry[]>([])
+const redoStack = ref<EditHistoryEntry[]>([])
+const MAX_HISTORY = 50
+
+// --- Hidden columns ---
+const hiddenColumnNames = ref<Set<string>>(new Set())
+
+// --- Add row sheet state ---
+const isAddRowSheetOpen = ref(false)
 const isSavingNewRow = ref(false)
-const newRowRef = ref<InstanceType<typeof InlineNewRow> | null>(null)
 
 // --- TanStack Table ---
 const globalFilter = ref('')
 const rowSelection = ref<Record<string, boolean>>({})
 
 const columns = computed(() => props.directory.columns || [])
+
+const visibleColumns = computed(() =>
+  columns.value.filter(c => !hiddenColumnNames.value.has(c.name))
+)
 
 // Column ordering (drag & drop)
 const columnOrder = ref<string[]>([])
@@ -330,9 +404,10 @@ watch(() => props.directory.columns, (newCols) => {
 }, { immediate: true })
 
 const orderedColumns = computed(() => {
-  if (columnOrder.value.length === 0) return columns.value
+  const base = visibleColumns.value
+  if (columnOrder.value.length === 0) return base
   return columnOrder.value
-    .map(name => columns.value.find(c => c.name === name))
+    .map(name => base.find(c => c.name === name))
     .filter((c): c is DirectoryColumn => c !== undefined)
 })
 
@@ -442,43 +517,18 @@ const handleDragEnd = () => {
   dragOverIndex.value = null
 }
 
-// --- Inline New Row ---
-const startAddingRow = () => {
+// --- Add Row Sheet ---
+const openAddRowSheet = () => {
   if (editingCell.value) cancelEdit()
-  const data: Record<string, any> = {}
-  columns.value.forEach(col => {
-    data[col.name] = col.type === 'bool' ? false : ''
-  })
-  newRowData.value = data
-  isAddingRow.value = true
-  nextTick(() => newRowRef.value?.focus())
+  isAddRowSheetOpen.value = true
 }
 
-const cancelNewRow = () => {
-  isAddingRow.value = false
-  newRowData.value = {}
-}
-
-const saveNewRow = async () => {
-  const hasData = Object.values(newRowData.value).some(v => v !== null && v !== undefined && v !== '')
-  if (!hasData || isSavingNewRow.value) return
-  
+const handleSheetSave = async (data: Record<string, any>) => {
+  if (isSavingNewRow.value) return
   isSavingNewRow.value = true
   try {
-    const cleanData: Record<string, any> = {}
-    Object.entries(newRowData.value).forEach(([key, value]) => {
-      cleanData[key] = value === '' ? null : value
-    })
-    emit('create', cleanData)
+    emit('create', data)
     await new Promise(resolve => setTimeout(resolve, 200))
-    
-    // Restart for continuous entry
-    const data: Record<string, any> = {}
-    columns.value.forEach(col => {
-      data[col.name] = col.type === 'bool' ? false : ''
-    })
-    newRowData.value = data
-    nextTick(() => newRowRef.value?.focus())
   } finally {
     isSavingNewRow.value = false
   }
@@ -514,7 +564,18 @@ const saveEdit = async () => {
   
   isSaving.value = true
   try {
-    const updatedData = { ...item.data, [colName]: newValue === '' ? null : newValue }
+    const cleanValue = newValue === '' ? null : newValue
+    const updatedData = { ...item.data, [colName]: cleanValue }
+
+    // Push to undo history before applying
+    pushHistory({
+      itemId,
+      colName,
+      oldValue: originalValue.value,
+      newValue: cleanValue,
+      timestamp: Date.now(),
+    })
+
     emit('update', itemId, updatedData)
     await new Promise(resolve => setTimeout(resolve, 200))
   } finally {
@@ -561,6 +622,98 @@ const handleKeydown = (
     })
   }
 }
+
+// --- Column Actions ---
+const openColumnSettings = (_column: DirectoryColumn) => {
+  emit('settings')
+}
+
+const hideColumn = (column: DirectoryColumn) => {
+  hiddenColumnNames.value.add(column.name)
+}
+
+const showAllColumns = () => {
+  hiddenColumnNames.value.clear()
+}
+
+const deleteColumn = (column: DirectoryColumn) => {
+  if (columns.value.length <= 1) return
+  emit('deleteColumn', column.name)
+}
+
+// --- Undo / Redo ---
+const pushHistory = (entry: EditHistoryEntry) => {
+  editHistory.value.push(entry)
+  if (editHistory.value.length > MAX_HISTORY) editHistory.value.shift()
+  redoStack.value = []
+}
+
+const canUndo = computed(() => editHistory.value.length > 0)
+const canRedo = computed(() => redoStack.value.length > 0)
+
+const undo = () => {
+  const entry = editHistory.value.pop()
+  if (!entry) return
+  redoStack.value.push(entry)
+  const item = props.items.find(i => i.id === entry.itemId)
+  if (!item) return
+  const restoredData = { ...item.data, [entry.colName]: entry.oldValue }
+  emit('update', entry.itemId, restoredData)
+}
+
+const redo = () => {
+  const entry = redoStack.value.pop()
+  if (!entry) return
+  editHistory.value.push(entry)
+  const item = props.items.find(i => i.id === entry.itemId)
+  if (!item) return
+  const reappliedData = { ...item.data, [entry.colName]: entry.newValue }
+  emit('update', entry.itemId, reappliedData)
+}
+
+// --- Row Actions ---
+const startEditRow = (item: DirectoryItem) => {
+  const firstCol = orderedColumns.value[0]
+  if (firstCol) startEdit(item, firstCol)
+}
+
+const duplicateRow = (item: DirectoryItem) => {
+  emit('create', { ...item.data })
+}
+
+// --- Global hotkeys ---
+const handleGlobalKeydown = (e: KeyboardEvent) => {
+  const isMod = e.ctrlKey || e.metaKey
+
+  // Ctrl+Z → undo
+  if (isMod && e.key === 'z' && !e.shiftKey) {
+    if (canUndo.value) { e.preventDefault(); undo() }
+    return
+  }
+  // Ctrl+Shift+Z or Ctrl+Y → redo
+  if ((isMod && e.key === 'z' && e.shiftKey) || (isMod && e.key === 'y')) {
+    if (canRedo.value) { e.preventDefault(); redo() }
+    return
+  }
+  // Ctrl+N → new row  (only when table is focused, not in input)
+  if (isMod && e.key === 'n' && !isAddRowSheetOpen.value && !editingCell.value) {
+    e.preventDefault(); openAddRowSheet()
+    return
+  }
+  // Delete / Backspace on selected rows
+  if ((e.key === 'Delete' || e.key === 'Backspace') && !editingCell.value && !isAddRowSheetOpen.value) {
+    const ids = selectedRowIds.value
+    if (ids.length > 0) { e.preventDefault(); emit('deleteSelected', ids) }
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleGlobalKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleGlobalKeydown)
+})
 
 // Reset selection when items change
 watch(() => props.items, () => { rowSelection.value = {} })

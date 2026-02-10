@@ -286,7 +286,7 @@ const templates: Template[] = [
     columns: [
       { name: 'name', label: 'Название', type: 'text', required: true, searchable: true },
       { name: 'description', label: 'Описание', type: 'text', required: false, searchable: true },
-      { name: 'price', label: 'Цена', type: 'numeric', required: false, searchable: false },
+      { name: 'price', label: 'Цена', type: 'number', required: false, searchable: false },
     ],
     defaultDescription: 'Найти услугу по названию или описанию'
   },
@@ -298,7 +298,7 @@ const templates: Template[] = [
     columns: [
       { name: 'name', label: 'Название', type: 'text', required: true, searchable: true },
       { name: 'description', label: 'Описание', type: 'text', required: false, searchable: true },
-      { name: 'price', label: 'Цена', type: 'numeric', required: false, searchable: false },
+      { name: 'price', label: 'Цена', type: 'number', required: false, searchable: false },
       { name: 'specs', label: 'Характеристики', type: 'text', required: false, searchable: true },
     ],
     defaultDescription: 'Найти товар по названию, описанию или характеристикам'

@@ -43,7 +43,7 @@
         </div>
       </transition>
 
-      <main class="flex-1 bg-slate-50 p-3 sm:p-4 lg:p-6">
+      <main class="flex-1 min-w-0 bg-slate-50 p-3 sm:p-4 lg:p-6">
         <div class="max-w-7xl mx-auto">
           <slot />
         </div>
