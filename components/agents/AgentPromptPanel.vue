@@ -267,6 +267,7 @@
             <SystemPromptVersionPreview
               v-model:open="showVersionPreview"
               :version="previewVersion"
+              :active-prompt="agent?.system_prompt ?? ''"
               :is-loading="isLoadingPreview"
               :is-activating="historyActivating"
               :can-activate="canEditAgents"

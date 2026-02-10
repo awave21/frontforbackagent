@@ -171,15 +171,20 @@ const emit = defineEmits<{
 const maxColumns = props.maxColumns || 15
 
 const columns = ref<ColumnDefinition[]>([])
+const isInternalUpdate = ref(false)
 
-// Инициализация
+const generateId = () => Math.random().toString(36).substring(2, 9)
+
+// Инициализация — пропускаем когда обновление пришло от нас самих
 watch(() => props.modelValue, (value) => {
+  if (isInternalUpdate.value) {
+    isInternalUpdate.value = false
+    return
+  }
   if (value && value.length > 0) {
     columns.value = value.map(col => ({ ...col, id: col.id || generateId() }))
   }
 }, { immediate: true })
-
-const generateId = () => Math.random().toString(36).substring(2, 9)
 
 const generateName = (col: ColumnDefinition) => {
   if (!col.label) {
@@ -217,6 +222,7 @@ const removeColumn = (index: number) => {
 }
 
 const emitUpdate = () => {
+  isInternalUpdate.value = true
   const cleanColumns = columns.value.map(({ id, ...rest }) => rest)
   emit('update:modelValue', cleanColumns as ColumnDefinition[])
 }

@@ -164,8 +164,10 @@
         <Table :style="{ width: `${table.getTotalSize() + 56}px`, minWidth: '100%' }">
           <TableHeader>
             <TableRow>
-              <TableHead class-name="w-10 !px-0">
-                <div class="flex items-center justify-center h-full">
+              <TableHead class-name="w-14 !px-0">
+                <div class="flex items-center justify-center gap-1 h-full">
+                  <!-- Невидимый spacer под размер кнопки "развернуть" в строках -->
+                  <span class="w-[26px] shrink-0"></span>
                   <input
                     type="checkbox"
                     :checked="table.getIsAllPageRowsSelected()"

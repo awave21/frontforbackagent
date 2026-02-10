@@ -60,14 +60,19 @@
               </div>
               <p v-if="version.change_summary" class="text-[11px] text-muted-foreground line-clamp-2 mb-1">{{ version.change_summary }}</p>
               <p class="text-[10px] text-muted-foreground/60">{{ version.prompt_length }} симв.</p>
-              <button
-                v-if="!version.is_active"
-                @click.stop="$emit('activate', version)"
-                :disabled="isActivating"
-                class="mt-1 text-[10px] font-medium text-primary hover:underline disabled:opacity-50"
-              >
-                Восстановить
-              </button>
+              <div class="flex items-center gap-3 mt-1">
+                <button
+                  v-if="!version.is_active"
+                  @click.stop="$emit('activate', version)"
+                  :disabled="isActivating"
+                  class="text-[10px] font-medium text-primary hover:underline disabled:opacity-50"
+                >
+                  Восстановить
+                </button>
+                <span class="text-[10px] font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                  Просмотр →
+                </span>
+              </div>
             </div>
 
             <!-- Кнопка «Загрузить ещё» -->
