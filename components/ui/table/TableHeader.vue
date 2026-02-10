@@ -1,6 +1,6 @@
 <template>
   <thead
-    :class="['bg-slate-50/60', className]"
+    :class="['bg-slate-50/50 border-b border-slate-200', className]"
     v-bind="attrs"
   >
     <slot />

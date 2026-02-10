@@ -1,7 +1,7 @@
 <template>
-  <div :class="['overflow-x-auto rounded-md border border-slate-200', wrapperClass]">
+  <div :class="['overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm', wrapperClass]">
     <table
-      class="min-w-full divide-y divide-slate-100 text-left"
+      class="min-w-full border-collapse text-left table-fixed"
       v-bind="attrs"
     >
       <slot />

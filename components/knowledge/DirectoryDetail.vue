@@ -113,34 +113,42 @@
       <Loader2 class="w-8 h-8 animate-spin text-indigo-600" />
     </div>
 
-    <!-- Empty State -->
-    <div 
-      v-else-if="items.length === 0 && !globalFilter" 
-      class="bg-background rounded-md border border-border p-12 text-center"
-    >
-      <div class="max-w-md mx-auto">
-        <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <FileText class="h-8 w-8 text-slate-400" />
-        </div>
-        <h3 class="text-lg font-bold text-slate-900">Записей пока нет</h3>
-        <p class="text-slate-500 mt-2 mb-6">
-          Добавьте записи вручную или загрузите из CSV-файла
-        </p>
-        <div class="flex items-center justify-center gap-3">
-          <button
-            @click="openAddRowSheet"
-            class="px-5 py-2.5 bg-indigo-600 text-white rounded-md text-sm font-bold hover:bg-indigo-700 transition-colors"
-          >
-            Добавить запись
-          </button>
-          <button
-            @click="$emit('import')"
-            class="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-md text-sm font-medium hover:bg-slate-50 transition-colors"
-          >
-            Загрузить CSV
-          </button>
-        </div>
-      </div>
+    <!-- Empty State: show table headers + empty body -->
+    <div v-else-if="items.length === 0 && !globalFilter" class="shadow-sm">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead class="w-12"></TableHead>
+            <TableHead
+              v-for="col in orderedColumns"
+              :key="col.name"
+              :style="{ minWidth: getColumnWidth(col) }"
+            >
+              <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">{{ col.label }}</span>
+            </TableHead>
+            <TableHead class-name="w-16"></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow>
+            <TableCell :class-name="`text-center py-12`" :colspan="orderedColumns.length + 2">
+              <div class="flex flex-col items-center">
+                <div class="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3">
+                  <FileText class="h-6 w-6 text-slate-400" />
+                </div>
+                <p class="text-sm font-medium text-slate-900">Записей пока нет</p>
+                <p class="text-xs text-slate-500 mt-1 mb-4">Добавьте первую запись</p>
+                <button
+                  @click="openAddRowSheet"
+                  class="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-bold hover:bg-indigo-700 transition-colors"
+                >
+                  Добавить запись
+                </button>
+              </div>
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
     </div>
 
     <!-- No Results -->
@@ -153,17 +161,19 @@
 
     <!-- Table with TanStack -->
     <div v-else-if="table.getRowModel().rows.length > 0" class="shadow-sm">
-        <Table>
+        <Table :style="{ width: `${table.getTotalSize() + 56}px`, minWidth: '100%' }">
           <TableHeader>
             <TableRow>
-              <TableHead class="w-12">
-                <input
-                  type="checkbox"
-                  :checked="table.getIsAllPageRowsSelected()"
-                  :indeterminate="table.getIsSomePageRowsSelected()"
-                  @change="table.toggleAllPageRowsSelected()"
-                  class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                />
+              <TableHead class-name="w-10 !px-0">
+                <div class="flex items-center justify-center h-full">
+                  <input
+                    type="checkbox"
+                    :checked="table.getIsAllPageRowsSelected()"
+                    :indeterminate="table.getIsSomePageRowsSelected()"
+                    @change="table.toggleAllPageRowsSelected()"
+                    class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                </div>
               </TableHead>
               <TableHead
                 v-for="header in table.getHeaderGroups()[0].headers.filter(h => h.id !== 'select' && h.id !== 'actions')" 
@@ -173,8 +183,8 @@
                 @dragleave="handleDragLeave"
                 @drop="handleDrop($event, header.index - 1)"
                 @dragend="handleDragEnd"
-                :class-name="`select-none transition-all ${dragOverIndex === header.index - 1 && dragIndex !== header.index - 1 ? 'bg-indigo-100 scale-105' : ''} ${dragIndex === header.index - 1 ? 'opacity-50' : ''}`"
-                :style="{ minWidth: getColumnWidth(header.column.columnDef.meta as any) }"
+                :class-name="`relative select-none ${dragOverIndex === header.index - 1 && dragIndex !== header.index - 1 ? 'bg-indigo-100' : ''} ${dragIndex === header.index - 1 ? 'opacity-50' : ''}`"
+                :style="{ width: `${header.getSize()}px` }"
               >
                 <ColumnHeaderDropdown
                   :column="header.column.columnDef.meta as any"
@@ -184,12 +194,28 @@
                   @hide="hideColumn(header.column.columnDef.meta as any)"
                   @delete="deleteColumn(header.column.columnDef.meta as any)"
                 />
+                <!-- Resize Handle -->
+                <div
+                  @mousedown="header.getResizeHandler()?.($event)"
+                  @touchstart="header.getResizeHandler()?.($event)"
+                  @dblclick="resetColumnSize(header)"
+                  class="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none group/resize"
+                  :class="header.column.getIsResizing() ? 'bg-indigo-400' : 'hover:bg-indigo-300'"
+                />
               </TableHead>
-              <!-- Add Column Button -->
-              <AddColumnPopover
-                :existing-columns="columns"
-                @add="(col) => $emit('addColumn', col)"
-              />
+              <!-- Add Column Button → opens settings sheet -->
+              <TableHead class-name="w-40">
+                <div class="flex justify-center">
+                  <button
+                    @click="$emit('settings')"
+                    class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                    title="Добавить столбец"
+                  >
+                    <Plus class="w-3.5 h-3.5" />
+                    Столбец
+                  </button>
+                </div>
+              </TableHead>
               <TableHead class-name="w-16"></TableHead>
             </TableRow>
           </TableHeader>
@@ -206,31 +232,40 @@
                 class="group"
                 :class="{ 'bg-indigo-50/30': editingCell?.itemId === row.original.id }"
               >
-                <TableCell class-name="px-4 py-2">
-                  <input
-                    type="checkbox"
-                    :checked="row.getIsSelected()"
-                    @change="row.toggleSelected()"
-                    class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                  />
+                <TableCell class-name="w-14 !px-0">
+                  <div class="flex items-center justify-center gap-1 h-full">
+                    <button
+                      @click="openEditRowSheet(row.original)"
+                      class="p-1 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors opacity-0 group-hover:opacity-100"
+                      title="Развернуть"
+                    >
+                      <Maximize2 class="w-3.5 h-3.5" />
+                    </button>
+                    <input
+                      type="checkbox"
+                      :checked="row.getIsSelected()"
+                      @change="row.toggleSelected()"
+                      class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                  </div>
                 </TableCell>
                 <TableCell 
                   v-for="col in orderedColumns" 
                   :key="col.name"
                   class-name="px-1 py-1"
-                  :style="{ minWidth: getColumnWidth(col) }"
+                  :style="{ width: `${getColSize(col.name)}px` }"
                 >
                   <EditableCell
                     :column="col"
                     :display-value="row.original.data[col.name]"
                     :model-value="editingCell?.itemId === row.original.id && editingCell?.colName === col.name ? editValue : row.original.data[col.name]"
                     :editing="isEditing(row.original.id, col.name)"
-                    :saving="isSaving"
+                    :saving="isSaving && isEditing(row.original.id, col.name)"
                     @update:model-value="editValue = $event"
                     @start-edit="startEdit(row.original, col)"
                     @blur="handleBlur"
                     @keydown="(e) => handleKeydown(e, row.original, col, row.index, orderedColumns.indexOf(col))"
-                    @save="saveEdit"
+                    @save="saveEdit(true)"
                   />
                 </TableCell>
                 <!-- Empty cell for add column -->
@@ -296,6 +331,16 @@
       @update:open="isAddRowSheetOpen = $event"
       @save="handleSheetSave"
     />
+
+    <!-- Edit Row Side Panel -->
+    <EditRowSheet
+      :open="isEditRowSheetOpen"
+      :columns="orderedColumns"
+      :item="editRowSheetItem"
+      :saving="isSavingEditRow"
+      @update:open="isEditRowSheetOpen = $event"
+      @save="handleEditRowSave"
+    />
   </div>
 </template>
 
@@ -320,25 +365,28 @@ import {
   Undo2,
   Redo2,
   EyeOff,
-  X
+  X,
+  Maximize2,
+  Plus,
 } from 'lucide-vue-next'
 import type { Directory, DirectoryItem, DirectoryColumn } from '~/types/directories'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '~/components/ui/table'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '~/components/ui/tooltip'
 import { pluralize } from '~/utils/pluralize'
-import { getColumnWidth as getColWidth } from '~/utils/directory-helpers'
+import { getColumnWidth as getColWidth, isLongTextField } from '~/utils/directory-helpers'
 
 import DirectoryDetailToolbar from './DirectoryDetailToolbar.vue'
 import EditableCell from './EditableCell.vue'
-import AddColumnPopover from './AddColumnPopover.vue'
 import ColumnHeaderDropdown from './ColumnHeaderDropdown.vue'
 import RowContextMenu from './RowContextMenu.vue'
 import AddRowSheet from './AddRowSheet.vue'
+import EditRowSheet from './EditRowSheet.vue'
 
 const props = defineProps<{
   directory: Directory
   items: DirectoryItem[]
   loading?: boolean
+  onUpdateItem?: (itemId: string, data: Record<string, any>) => Promise<void>
 }>()
 
 const emit = defineEmits<{
@@ -360,6 +408,8 @@ const editingCell = ref<{ itemId: string; colName: string } | null>(null)
 const editValue = ref<any>('')
 const originalValue = ref<any>('')
 const isSaving = ref(false)
+const blurTimeoutId = ref<ReturnType<typeof setTimeout> | null>(null)
+
 
 // --- Undo/Redo history ---
 type EditHistoryEntry = {
@@ -379,6 +429,11 @@ const hiddenColumnNames = ref<Set<string>>(new Set())
 // --- Add row sheet state ---
 const isAddRowSheetOpen = ref(false)
 const isSavingNewRow = ref(false)
+
+// --- Edit row sheet state ---
+const isEditRowSheetOpen = ref(false)
+const editRowSheetItem = ref<DirectoryItem | null>(null)
+const isSavingEditRow = ref(false)
 
 // --- TanStack Table ---
 const globalFilter = ref('')
@@ -411,6 +466,15 @@ const orderedColumns = computed(() => {
     .filter((c): c is DirectoryColumn => c !== undefined)
 })
 
+// Column size defaults by type
+const getDefaultSize = (col: DirectoryColumn): number => {
+  if (col.type === 'bool') return 80
+  if (col.type === 'number') return 100
+  if (col.type === 'date') return 120
+  if (isLongTextField(col.name)) return 200
+  return 140
+}
+
 // Build TanStack column defs from ordered columns
 const tanstackColumns = computed<ColumnDef<DirectoryItem, any>[]>(() => {
   return orderedColumns.value.map(col => ({
@@ -419,6 +483,9 @@ const tanstackColumns = computed<ColumnDef<DirectoryItem, any>[]>(() => {
     header: col.label,
     meta: col,
     filterFn: 'includesString',
+    size: getDefaultSize(col),
+    minSize: 40,
+    maxSize: 500,
   }))
 })
 
@@ -435,6 +502,7 @@ const table = useVueTable({
   onRowSelectionChange: (updater) => {
     rowSelection.value = typeof updater === 'function' ? updater(rowSelection.value) : updater
   },
+  columnResizeMode: 'onChange' as const,
   getCoreRowModel: getCoreRowModel(),
   getFilteredRowModel: getFilteredRowModel(),
   getPaginationRowModel: getPaginationRowModel(),
@@ -460,6 +528,16 @@ const itemsLabel = computed(() =>
 )
 
 const getColumnWidth = (col: DirectoryColumn) => getColWidth(col.type, col.name)
+
+// Get current column size from table state (for body cells)
+const getColSize = (colName: string): number => {
+  return table.getColumn(colName)?.getSize() ?? 140
+}
+
+// Reset column size on double-click
+const resetColumnSize = (header: any) => {
+  header.column.resetSize()
+}
 
 // --- Visible pages for pagination ---
 const visiblePages = computed(() => {
@@ -534,12 +612,41 @@ const handleSheetSave = async (data: Record<string, any>) => {
   }
 }
 
+// --- Edit Row Sheet ---
+const openEditRowSheet = (item: DirectoryItem) => {
+  if (editingCell.value) cancelEdit()
+  editRowSheetItem.value = item
+  isEditRowSheetOpen.value = true
+}
+
+const handleEditRowSave = async (itemId: string, data: Record<string, any>) => {
+  isSavingEditRow.value = true
+  try {
+    if (props.onUpdateItem) {
+      await props.onUpdateItem(itemId, data)
+    } else {
+      emit('update', itemId, data)
+    }
+    isEditRowSheetOpen.value = false
+  } finally {
+    isSavingEditRow.value = false
+  }
+}
+
 // --- Inline Editing ---
 const isEditing = (itemId: string, colName: string) =>
   editingCell.value?.itemId === itemId && editingCell.value?.colName === colName
 
 const startEdit = (item: DirectoryItem, col: DirectoryColumn) => {
-  if (editingCell.value) saveEdit()
+  // Cancel pending blur timeout to prevent it from cancelling the new edit
+  if (blurTimeoutId.value) {
+    clearTimeout(blurTimeoutId.value)
+    blurTimeoutId.value = null
+  }
+  // Save and close previous cell if it has changes
+  if (editingCell.value) {
+    saveEdit(true)
+  }
   editingCell.value = { itemId: item.id, colName: col.name }
   const rawValue = item.data[col.name]
   editValue.value = rawValue ?? ''
@@ -552,45 +659,73 @@ const cancelEdit = () => {
   originalValue.value = ''
 }
 
-const saveEdit = async () => {
+const saveEdit = async (shouldClose = false) => {
   if (!editingCell.value || isSaving.value) return
   const { itemId, colName } = editingCell.value
   const newValue = editValue.value
   
-  if (newValue === originalValue.value) { cancelEdit(); return }
+  if (newValue === originalValue.value) { 
+    if (shouldClose) cancelEdit()
+    return 
+  }
   
   const item = props.items.find(i => i.id === itemId)
-  if (!item) { cancelEdit(); return }
+  if (!item) { 
+    if (shouldClose) cancelEdit()
+    return 
+  }
   
-  isSaving.value = true
-  try {
-    const cleanValue = newValue === '' ? null : newValue
-    const updatedData = { ...item.data, [colName]: cleanValue }
+  const cleanValue = newValue === '' ? null : newValue
+  const updatedData = { ...item.data, [colName]: cleanValue }
+  const prevOriginal = originalValue.value
 
-    // Push to undo history before applying
+  // 1. Показать индикатор сохранения
+  isSaving.value = true
+
+  try {
+    // 2. Отправить на сервер и дождаться ответа
+    if (props.onUpdateItem) {
+      await props.onUpdateItem(itemId, updatedData)
+    } else {
+      emit('update', itemId, updatedData)
+    }
+
+    // 3. Записать в undo-историю
     pushHistory({
       itemId,
       colName,
-      oldValue: originalValue.value,
+      oldValue: prevOriginal,
       newValue: cleanValue,
       timestamp: Date.now(),
     })
-
-    emit('update', itemId, updatedData)
-    await new Promise(resolve => setTimeout(resolve, 200))
   } finally {
     isSaving.value = false
+  }
+
+  // 4. Закрыть редактирование после успешного сохранения
+  if (shouldClose) {
     cancelEdit()
   }
 }
 
 const handleBlur = () => {
-  setTimeout(() => {
-    if (editingCell.value) saveEdit()
+  if (blurTimeoutId.value) clearTimeout(blurTimeoutId.value)
+  // Capture which cell is blurring
+  const blurringCell = editingCell.value ? { ...editingCell.value } : null
+  blurTimeoutId.value = setTimeout(() => {
+    blurTimeoutId.value = null
+    // Only save if the same cell is still being edited
+    if (
+      editingCell.value && blurringCell &&
+      editingCell.value.itemId === blurringCell.itemId &&
+      editingCell.value.colName === blurringCell.colName
+    ) {
+      saveEdit(true) // Закрыть редактирование при blur
+    }
   }, 150)
 }
 
-const handleKeydown = (
+const handleKeydown = async (
   event: KeyboardEvent, 
   item: DirectoryItem, 
   col: DirectoryColumn, 
@@ -598,11 +733,16 @@ const handleKeydown = (
   colIndex: number
 ) => {
   if (event.key === 'Escape') { event.preventDefault(); cancelEdit(); return }
-  if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); saveEdit(); return }
+  
+  if (event.key === 'Enter' && !event.shiftKey) { 
+    event.preventDefault()
+    await saveEdit(true)
+    return 
+  }
   
   if (event.key === 'Tab') {
     event.preventDefault()
-    saveEdit()
+    await saveEdit(true)
     
     nextTick(() => {
       const cols = orderedColumns.value
@@ -651,24 +791,32 @@ const pushHistory = (entry: EditHistoryEntry) => {
 const canUndo = computed(() => editHistory.value.length > 0)
 const canRedo = computed(() => redoStack.value.length > 0)
 
-const undo = () => {
+const undo = async () => {
   const entry = editHistory.value.pop()
   if (!entry) return
   redoStack.value.push(entry)
   const item = props.items.find(i => i.id === entry.itemId)
   if (!item) return
   const restoredData = { ...item.data, [entry.colName]: entry.oldValue }
-  emit('update', entry.itemId, restoredData)
+  if (props.onUpdateItem) {
+    await props.onUpdateItem(entry.itemId, restoredData)
+  } else {
+    emit('update', entry.itemId, restoredData)
+  }
 }
 
-const redo = () => {
+const redo = async () => {
   const entry = redoStack.value.pop()
   if (!entry) return
   editHistory.value.push(entry)
   const item = props.items.find(i => i.id === entry.itemId)
   if (!item) return
   const reappliedData = { ...item.data, [entry.colName]: entry.newValue }
-  emit('update', entry.itemId, reappliedData)
+  if (props.onUpdateItem) {
+    await props.onUpdateItem(entry.itemId, reappliedData)
+  } else {
+    emit('update', entry.itemId, reappliedData)
+  }
 }
 
 // --- Row Actions ---
@@ -713,10 +861,13 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
+  if (blurTimeoutId.value) clearTimeout(blurTimeoutId.value)
 })
 
 // Reset selection when items change
-watch(() => props.items, () => { rowSelection.value = {} })
+watch(() => props.items, () => {
+  rowSelection.value = {}
+}, { deep: true })
 
 // Cancel edit when page changes
 watch(() => table.getState().pagination.pageIndex, () => { cancelEdit() })

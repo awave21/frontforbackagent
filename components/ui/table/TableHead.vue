@@ -1,6 +1,6 @@
 <template>
   <th
-    :class="['px-4 py-3 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400', className]"
+    :class="['px-2 py-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-r border-slate-200 last:border-r-0 bg-slate-50/50 text-left', className]"
     scope="col"
     v-bind="attrs"
   >

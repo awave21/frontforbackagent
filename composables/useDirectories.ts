@@ -283,10 +283,8 @@ export const useDirectories = (agentId: string) => {
         }
       )
       
-      const index = items.value.findIndex(i => i.id === itemId)
-      if (index !== -1) {
-        items.value[index] = updated
-      }
+      // Создаём новый массив, чтобы TanStack Table гарантированно увидел изменение
+      items.value = items.value.map(i => i.id === itemId ? updated : i)
       
       return updated
     } catch (err: any) {

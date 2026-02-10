@@ -11,10 +11,10 @@
           :directory="selectedDirectory"
           :items="directoryItems"
           :loading="directoryItemsLoading"
+          :on-update-item="handleUpdateItem"
           @back="handleBackToList"
           @settings="showDirectorySettingsSheet = true"
           @create="handleCreateItem"
-          @update="handleUpdateItem"
           @delete="handleDeleteItem"
           @delete-selected="handleDeleteSelectedItems"
           @import="showImportCsvModal = true"
@@ -99,7 +99,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { Database } from 'lucide-vue-next'
-import { navigateTo } from '#app'
+import { navigateTo, useRoute, useRouter } from '#app'
 import { useAgentEditorStore } from '~/composables/useAgentEditorStore'
 import { useToast } from '~/composables/useToast'
 import type { Directory } from '~/types/directories'
@@ -112,6 +112,8 @@ import DirectorySettingsSheet from '~/components/knowledge/DirectorySettingsShee
 import SQNSIntegrationManager from '~/components/SQNSIntegrationManager.vue'
 
 const store = useAgentEditorStore()
+const route = useRoute()
+const router = useRouter()
 const { agent, directoriesComposable, isSqnsEnabled, sqnsToolsList, sqnsStatus } = storeToRefs(store)
 const { success: toastSuccess, error: toastError } = useToast()
 
@@ -136,6 +138,25 @@ const knowledgeSubTabs = computed(() => [
 const loadDirectories = async () => {
   await store.ensureDirectoriesLoaded()
 }
+
+// Восстановление выбранного справочника из URL query при загрузке
+const restoreDirectoryFromQuery = () => {
+  const directoryId = route.query.directoryId as string | undefined
+  if (!directoryId || !directoriesComposable.value) return
+  // Если справочник уже выбран — не трогаем
+  if (selectedDirectory.value?.id === directoryId) return
+  const dir = directories.value.find(d => d.id === directoryId)
+  if (dir) {
+    directoriesComposable.value.setCurrentDirectory(dir)
+  }
+}
+
+// Следим за загрузкой directories, чтобы восстановить выбранный справочник из query
+watch(directories, (newDirs) => {
+  if (newDirs.length > 0) {
+    restoreDirectoryFromQuery()
+  }
+})
 
 onMounted(() => {
   if (knowledgeSubTab.value === 'directories') {
@@ -179,12 +200,17 @@ const handleCreateDirectory = async (data: any) => {
 const handleSelectDirectory = (dir: Directory) => {
   if (directoriesComposable.value) {
     directoriesComposable.value.setCurrentDirectory(dir)
+    // Сохраняем ID справочника в query, чтобы при перезагрузке он восстановился
+    router.replace({ query: { ...route.query, directoryId: dir.id } })
   }
 }
 
 const handleBackToList = () => {
   if (directoriesComposable.value) {
     directoriesComposable.value.setCurrentDirectory(null)
+    // Убираем directoryId из query
+    const { directoryId, ...rest } = route.query
+    router.replace({ query: rest })
   }
 }
 
@@ -307,6 +333,9 @@ const handleDeleteDirectoryFromSettings = async (id: string) => {
   try {
     await directoriesComposable.value.deleteDirectory(id)
     showDirectorySettingsSheet.value = false
+    // Убираем directoryId из query после удаления
+    const { directoryId, ...rest } = route.query
+    router.replace({ query: rest })
     toastSuccess('Справочник удалён')
   } catch (err: any) {
     directorySettingsSheetRef.value?.setError(err.message || 'Не удалось удалить справочник')

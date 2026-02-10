@@ -1,6 +1,6 @@
 <template>
   <tbody
-    :class="['divide-y divide-slate-100', className]"
+    :class="['bg-white', className]"
     v-bind="attrs"
   >
     <slot />

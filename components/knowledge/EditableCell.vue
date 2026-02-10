@@ -8,7 +8,7 @@
       @input="$emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
       :placeholder="column.label"
       rows="3"
-      class="w-full px-3 py-2 text-sm border-2 border-indigo-400 rounded-lg bg-white focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 resize-none"
+      class="w-full px-2 py-1.5 text-sm border-2 border-indigo-500 rounded bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 resize-none"
       @blur="$emit('blur')"
       @keydown="$emit('keydown', $event)"
     />
@@ -20,7 +20,7 @@
       type="number"
       step="any"
       :placeholder="column.label"
-      class="w-full px-3 py-2 text-sm border-2 border-indigo-400 rounded-lg bg-white focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 font-mono"
+      class="w-full px-2 py-1.5 text-sm border-2 border-indigo-500 rounded bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 font-mono"
       @blur="$emit('blur')"
       @keydown="$emit('keydown', $event)"
     />
@@ -30,22 +30,22 @@
       :value="modelValue"
       @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
       type="date"
-      class="w-full px-3 py-2 text-sm border-2 border-indigo-400 rounded-lg bg-white focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+      class="w-full px-2 py-1.5 text-sm border-2 border-indigo-500 rounded bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-100"
       @blur="$emit('blur')"
       @keydown="$emit('keydown', $event)"
     />
     <label
       v-else-if="column.type === 'bool'"
-      class="flex items-center gap-2 px-3 py-2 cursor-pointer"
+      class="flex items-center gap-2 px-2 py-1.5 cursor-pointer bg-indigo-50/50 rounded"
     >
       <input
         ref="inputRef"
         :checked="!!modelValue"
         @change="$emit('update:modelValue', ($event.target as HTMLInputElement).checked); $emit('save')"
         type="checkbox"
-        class="w-5 h-5 rounded border-indigo-400 text-indigo-600 focus:ring-indigo-500"
+        class="w-4 h-4 rounded border-indigo-400 text-indigo-600 focus:ring-indigo-500"
       />
-      <span class="text-sm">{{ modelValue ? 'Да' : 'Нет' }}</span>
+      <span class="text-xs font-medium text-indigo-700">{{ modelValue ? 'Да' : 'Нет' }}</span>
     </label>
     <input
       v-else
@@ -54,7 +54,7 @@
       @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
       type="text"
       :placeholder="column.label"
-      class="w-full px-3 py-2 text-sm border-2 border-indigo-400 rounded-lg bg-white focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+      class="w-full px-2 py-1.5 text-sm border-2 border-indigo-500 rounded bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-100"
       @blur="$emit('blur')"
       @keydown="$emit('keydown', $event)"
     />
@@ -68,7 +68,7 @@
   <div 
     v-else
     @click="$emit('startEdit')"
-    class="px-3 py-2 text-sm text-slate-700 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors min-h-[36px] flex items-center"
+    class="px-2 py-1.5 text-sm text-slate-700 rounded cursor-pointer hover:bg-slate-100/80 transition-colors min-h-[32px] flex items-center"
     :class="{ 
       'font-mono': column.type === 'number',
       'text-slate-400 italic': displayValue === null || displayValue === undefined || displayValue === ''
@@ -77,17 +77,17 @@
     <!-- Bool display -->
     <span v-if="column.type === 'bool'" class="flex items-center gap-1.5">
       <span 
-        class="w-4 h-4 rounded flex items-center justify-center text-white text-xs"
-        :class="displayValue ? 'bg-green-500' : 'bg-slate-300'"
+        class="w-3.5 h-3.5 rounded flex items-center justify-center text-white text-[10px]"
+        :class="displayValue ? 'bg-green-500' : 'bg-slate-200'"
       >
         {{ displayValue ? '✓' : '' }}
       </span>
-      <span :class="displayValue ? 'text-green-700' : 'text-slate-400'">
+      <span class="text-xs" :class="displayValue ? 'text-green-700 font-medium' : 'text-slate-400'">
         {{ displayValue ? 'Да' : 'Нет' }}
       </span>
     </span>
     <!-- Other types -->
-    <span v-else class="line-clamp-2">
+    <span v-else class="line-clamp-2 leading-tight">
       {{ formattedValue || 'Пусто' }}
     </span>
   </div>

@@ -5,16 +5,16 @@
         <TooltipTrigger as-child>
           <DropdownMenuTrigger as-child>
             <div
-              class="flex items-center gap-1.5 cursor-pointer group hover:bg-slate-50 -mx-2 px-2 py-1 rounded transition-colors"
+              class="flex items-center gap-1 cursor-pointer group hover:bg-slate-50 -mx-2 px-2 py-1 rounded transition-colors w-full"
               draggable="true"
               @dragstart="$emit('dragstart', $event)"
             >
               <GripVertical class="w-3 h-3 text-slate-300 group-hover:text-slate-500 shrink-0" />
-              <span class="select-none truncate">{{ column.label }}</span>
+              <span class="select-none truncate flex-1 text-left">{{ column.label }}</span>
               <span v-if="column.type !== 'text'" class="text-[10px] text-slate-400 font-mono shrink-0">
                 {{ typeLabel }}
               </span>
-              <ChevronDown class="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity ml-auto shrink-0" />
+              <ChevronDown class="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
             </div>
           </DropdownMenuTrigger>
         </TooltipTrigger>

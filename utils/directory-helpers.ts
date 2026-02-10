@@ -46,9 +46,11 @@ export const validateToolName = (
  * Ширина колонки по типу
  */
 export const getColumnWidth = (colType: string, colName: string): string => {
-  if (colType === 'number') return '120px'
-  if (isLongTextField(colName)) return '250px'
-  return '180px'
+  if (colType === 'bool') return '80px'
+  if (colType === 'number') return '100px'
+  if (colType === 'date') return '120px'
+  if (isLongTextField(colName)) return '200px'
+  return '140px'
 }
 
 /**
