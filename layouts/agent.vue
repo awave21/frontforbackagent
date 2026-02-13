@@ -1,13 +1,13 @@
 <template>
-  <div class="min-h-screen bg-slate-50">
+  <div class="h-screen flex flex-col bg-slate-50 overflow-hidden">
     <!-- Mobile Header -->
-    <div v-if="!isPromptFullscreen" class="lg:hidden bg-white border-b border-slate-200 px-4 py-3">
+    <div v-if="!isPromptFullscreen" class="lg:hidden bg-white border-b border-slate-200 px-4 py-3 shrink-0">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
           <div class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-            <span class="text-white font-bold text-xs">М</span>
+            <span class="text-white font-bold text-xs">{{ tenant?.name ? tenant.name.charAt(0).toUpperCase() : 'О' }}</span>
           </div>
-          <span class="text-slate-900 font-bold">МедиАИ</span>
+          <span class="text-slate-900 font-bold">{{ tenant?.name || 'Организация' }}</span>
         </div>
         <button
           @click="isSidebarOpen = !isSidebarOpen"
@@ -18,8 +18,8 @@
       </div>
     </div>
 
-    <div class="flex">
-      <DashboardSidebar :class="isPromptFullscreen ? 'hidden' : 'hidden lg:block'" />
+    <div class="flex flex-1 min-h-0">
+      <DashboardSidebar :class="isPromptFullscreen ? 'hidden' : 'hidden lg:flex'" />
 
       <div
         v-if="isSidebarOpen"
@@ -43,10 +43,8 @@
         </div>
       </transition>
 
-      <main class="flex-1 min-w-0 bg-slate-50 p-3 sm:p-4 lg:p-6">
-        <div class="max-w-7xl mx-auto">
-          <slot />
-        </div>
+      <main class="flex-1 min-w-0 bg-slate-50 overflow-y-auto">
+        <slot />
       </main>
     </div>
   </div>
@@ -58,7 +56,9 @@ import { storeToRefs } from 'pinia'
 import { MenuIcon } from 'lucide-vue-next'
 import DashboardSidebar from '~/components/DashboardSidebar.vue'
 import { useAgentEditorStore } from '~/composables/useAgentEditorStore'
+import { useAuth } from '~/composables/useAuth'
 
+const { tenant } = useAuth()
 const isSidebarOpen = ref(false)
 const store = useAgentEditorStore()
 const { isPromptFullscreen } = storeToRefs(store)

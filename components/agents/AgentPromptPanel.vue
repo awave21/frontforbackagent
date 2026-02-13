@@ -3,7 +3,7 @@
     class="flex flex-col lg:flex-row gap-4 transition-all duration-300"
     :class="isPromptFullscreen
       ? 'fixed inset-0 z-[100] bg-slate-50 p-4 lg:p-6'
-      : 'h-[calc(100vh-280px)] min-h-[600px]'"
+      : 'flex-1 min-h-0'"
   >
     <div class="flex-1 flex flex-col bg-background rounded-md border border-border overflow-hidden min-w-0 min-h-0">
       <div class="flex items-center justify-between px-4 py-3 border-b border-border bg-background">

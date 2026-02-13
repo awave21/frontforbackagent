@@ -50,7 +50,7 @@
           ]"
         >
           <div v-if="msg.role === 'user'" class="whitespace-pre-wrap">{{ msg.content }}</div>
-          <div v-else v-html="md.render(msg.content)"></div>
+          <div v-else v-html="renderAgentContent(msg.content)"></div>
         </div>
         <div class="flex flex-col gap-1.5 mt-1.5">
           <div class="flex items-center gap-2">
@@ -137,15 +137,20 @@
 <script setup lang="ts">
 import { nextTick, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import MarkdownIt from 'markdown-it'
 import { MessageSquare, Send } from 'lucide-vue-next'
 import { useAgentEditorStore } from '~/composables/useAgentEditorStore'
+import { createSafeMarkdownRenderer } from '~/utils/safe-markdown'
 
-const md = new MarkdownIt({
-  html: true,
+const md = createSafeMarkdownRenderer({
   linkify: true,
+  breaks: false,
   typographer: true
 })
+
+const renderAgentContent = (content: unknown) => {
+  if (typeof content !== 'string') return ''
+  return md.render(content)
+}
 
 const store = useAgentEditorStore()
 const { messages, userInput, isTyping, chatContextLabel, agent } = storeToRefs(store)

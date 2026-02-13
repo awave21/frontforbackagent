@@ -32,6 +32,16 @@ export default defineNuxtConfig({
     },
   },
 
+  components: {
+    dirs: [
+      {
+        path: '~/components',
+        // Ignore barrel index.ts files in UI dirs — they conflict with .vue auto-import
+        ignore: ['ui/**/index.ts'],
+      },
+    ],
+  },
+
   ssr: false,
 
   app: {

@@ -454,6 +454,7 @@ import {
 } from 'lucide-vue-next'
 import { useAgents } from '../composables/useAgents'
 import { useToast } from '../composables/useToast'
+import { getReadableErrorMessage } from '~/utils/api-errors'
 import {
   Table,
   TableBody,
@@ -595,7 +596,7 @@ const handleSync = async () => {
     loadCategories()
     await loadSpecialists()
   } catch (err: any) {
-    toastError('Ошибка синхронизации', err.message)
+    toastError('Ошибка синхронизации', getReadableErrorMessage(err, 'Не удалось выполнить синхронизацию'))
   } finally {
     isSyncing.value = false
   }
@@ -630,7 +631,7 @@ const handleToggleService = async (service: any) => {
   } catch (err: any) {
     // Откатываем UI при ошибке
     service.is_enabled = originalState
-    toastError('Ошибка', err.message)
+    toastError('Ошибка', getReadableErrorMessage(err, 'Не удалось изменить статус услуги'))
     console.error('❌ Toggle error:', err)
     // Перезагружаем список для отката к реальному состоянию
     await loadServices()
@@ -650,7 +651,7 @@ const handleUpdatePriority = async (service: any) => {
     await loadServices(true)
     toastSuccess('Приоритет обновлен', `Для услуги "${service.name}" установлен приоритет ${nextPriority}`)
   } catch (err: any) {
-    toastError('Ошибка', err.message)
+    toastError('Ошибка', getReadableErrorMessage(err, 'Не удалось обновить приоритет услуги'))
     await loadServices(true)
   }
 }
@@ -667,7 +668,7 @@ const handleBulkUpdate = async (is_enabled: boolean) => {
     await loadServices(true)
     toastSuccess('Массовое обновление', `Успешно обновлено ${selectedIds.value.length} услуг`)
   } catch (err: any) {
-    toastError('Ошибка', err.message)
+    toastError('Ошибка', getReadableErrorMessage(err, 'Не удалось выполнить массовое обновление'))
     await loadServices(true)
   }
 }
@@ -687,7 +688,7 @@ const handleToggleCategory = async (cat: any) => {
   } catch (err: any) {
     // Откат при ошибке
     cat.is_enabled = originalState
-    toastError('Ошибка', err.message)
+    toastError('Ошибка', getReadableErrorMessage(err, 'Не удалось изменить статус категории'))
     await loadCategories(true)
   }
 }
@@ -706,7 +707,7 @@ const handleUpdateCategoryPriority = async (cat: any) => {
     await loadCategories(true)
     toastSuccess('Приоритет категории обновлен', `Для категории "${cat.name}" установлен приоритет ${nextPriority}`)
   } catch (err: any) {
-    toastError('Ошибка', err.message)
+    toastError('Ошибка', getReadableErrorMessage(err, 'Не удалось обновить приоритет категории'))
     await loadCategories(true)
   }
 }

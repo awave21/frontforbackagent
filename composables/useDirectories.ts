@@ -1,6 +1,8 @@
 import { ref, computed } from 'vue'
 import { useApiFetch } from './useApiFetch'
 import { useAuth } from './useAuth'
+import { getStoredAccessToken } from '~/composables/authSessionManager'
+import { getReadableErrorMessage, getHttpStatusMessage } from '~/utils/api-errors'
 import type {
   DirectoryColumn,
   Directory,
@@ -73,21 +75,16 @@ export const useDirectories = (agentId: string) => {
       directories.value = data || []
       console.log(`✅ Loaded ${directories.value.length} directories`)
     } catch (err: any) {
-      // Проверяем тип ошибки
       const status = err?.status || err?.statusCode || err?.response?.status
       
       if (status === 404) {
-        // Эндпоинт не существует - бэкенд не реализован
         console.warn('⚠️  Directories API not implemented on backend (404)')
-        error.value = 'API справочников не реализован на сервере'
-        directories.value = []
-      } else if (status === 500 || status === 502 || status === 503) {
-        console.error('❌ Server error loading directories:', status)
-        error.value = 'Ошибка сервера при загрузке справочников'
+        error.value = 'Функция справочников пока недоступна'
         directories.value = []
       } else {
-        error.value = err?.message || 'Не удалось загрузить справочники'
+        error.value = getReadableErrorMessage(err, 'Не удалось загрузить справочники')
         console.error('Failed to fetch directories:', err)
+        if (status >= 500) directories.value = []
       }
     } finally {
       isLoading.value = false
@@ -127,21 +124,13 @@ export const useDirectories = (agentId: string) => {
       return created
     } catch (err: any) {
       const status = err?.status || err?.statusCode || err?.response?.status
-      const message = err?.data?.detail || err?.data?.message || err?.message
+      console.error('❌ Failed to create directory:', err)
       
-      console.error('❌ Failed to create directory:', { status, message, err })
-      
-      if (status === 404) {
-        throw new Error('API справочников не реализован на сервере (404)')
-      } else if (status === 422) {
-        throw new Error(`Ошибка валидации: ${message || 'неверные данные'}`)
-      } else if (status === 409) {
+      if (status === 409) {
         throw new Error('Справочник с таким именем уже существует')
-      } else if (status >= 500) {
-        throw new Error(`Ошибка сервера (${status}): ${message || 'попробуйте позже'}`)
       }
       
-      throw new Error(message || 'Не удалось создать справочник')
+      throw new Error(getReadableErrorMessage(err, 'Не удалось создать справочник'))
     }
   }
 
@@ -168,7 +157,7 @@ export const useDirectories = (agentId: string) => {
       
       return updated
     } catch (err: any) {
-      throw new Error(err?.message || 'Не удалось обновить справочник')
+      throw new Error(getReadableErrorMessage(err, 'Не удалось обновить справочник'))
     }
   }
 
@@ -186,7 +175,7 @@ export const useDirectories = (agentId: string) => {
         currentDirectory.value = null
       }
     } catch (err: any) {
-      throw new Error(err?.message || 'Не удалось удалить справочник')
+      throw new Error(getReadableErrorMessage(err, 'Не удалось удалить справочник'))
     }
   }
 
@@ -207,7 +196,7 @@ export const useDirectories = (agentId: string) => {
         directories.value[index].is_enabled = enabled
       }
     } catch (err: any) {
-      throw new Error(err?.message || 'Не удалось изменить статус справочника')
+      throw new Error(getReadableErrorMessage(err, 'Не удалось изменить статус справочника'))
     }
   }
 
@@ -264,7 +253,7 @@ export const useDirectories = (agentId: string) => {
       
       return created
     } catch (err: any) {
-      throw new Error(err?.message || 'Не удалось добавить запись')
+      throw new Error(getReadableErrorMessage(err, 'Не удалось добавить запись'))
     }
   }
 
@@ -288,7 +277,7 @@ export const useDirectories = (agentId: string) => {
       
       return updated
     } catch (err: any) {
-      throw new Error(err?.message || 'Не удалось обновить запись')
+      throw new Error(getReadableErrorMessage(err, 'Не удалось обновить запись'))
     }
   }
 
@@ -314,7 +303,7 @@ export const useDirectories = (agentId: string) => {
         currentDirectory.value.items_count--
       }
     } catch (err: any) {
-      throw new Error(err?.message || 'Не удалось удалить запись')
+      throw new Error(getReadableErrorMessage(err, 'Не удалось удалить запись'))
     }
   }
 
@@ -344,7 +333,7 @@ export const useDirectories = (agentId: string) => {
         currentDirectory.value.items_count -= ids.length
       }
     } catch (err: any) {
-      throw new Error(err?.message || 'Не удалось удалить записи')
+      throw new Error(getReadableErrorMessage(err, 'Не удалось удалить записи'))
     }
   }
 
@@ -377,7 +366,7 @@ export const useDirectories = (agentId: string) => {
       
       return result
     } catch (err: any) {
-      throw new Error(err?.message || 'Не удалось импортировать файл')
+      throw new Error(getReadableErrorMessage(err, 'Не удалось импортировать файл'))
     }
   }
 
@@ -388,9 +377,7 @@ export const useDirectories = (agentId: string) => {
       const { public: { apiBase } } = useRuntimeConfig()
       
       // Получаем актуальный токен
-      const authToken = typeof window !== 'undefined' 
-        ? localStorage.getItem('auth_token') 
-        : null
+      const authToken = getStoredAccessToken()
       
       if (!authToken) {
         throw new Error('Не авторизован')
@@ -401,6 +388,7 @@ export const useDirectories = (agentId: string) => {
         `${apiBase}/agents/${agentId}/directories/${directoryId}/export?format=csv`,
         {
           method: 'GET',
+          credentials: 'include',
           headers: { 
             'Authorization': `Bearer ${authToken}`,
             'Accept': 'text/csv'
@@ -409,10 +397,7 @@ export const useDirectories = (agentId: string) => {
       )
       
       if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Сессия истекла. Пожалуйста, войдите снова.')
-        }
-        throw new Error(`Ошибка экспорта: ${response.status}`)
+        throw new Error(getHttpStatusMessage(response.status, 'Не удалось экспортировать справочник'))
       }
       
       const blob = await response.blob()
@@ -431,7 +416,7 @@ export const useDirectories = (agentId: string) => {
       URL.revokeObjectURL(url)
     } catch (err: any) {
       console.error('❌ Export CSV error:', err)
-      throw new Error(err?.message || 'Не удалось экспортировать справочник')
+      throw new Error(getReadableErrorMessage(err, 'Не удалось экспортировать справочник'))
     }
   }
 

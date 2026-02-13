@@ -155,6 +155,7 @@ import { ref } from 'vue'
 import { X, Loader2 } from 'lucide-vue-next'
 import { useApiFetch } from '../../composables/useApiFetch'
 import { useToast } from '../../composables/useToast'
+import { getReadableErrorMessage } from '~/utils/api-errors'
 
 interface Props {
   isOpen: boolean
@@ -235,15 +236,11 @@ const handleInvite = async () => {
     inviteLink.value = resolveInviteLink(response.invite_link)
     toast.success('Приглашение создано', 'Ссылка для приглашения готова к использованию')
   } catch (err: any) {
-    const apiError = err?.apiError || err
     const status = err?.status || err?.statusCode || err?.response?.status
     
-    let errorMessage: string
-    if (status === 409) {
-      errorMessage = 'Приглашение для этого email уже существует. Удалите старое или используйте другой email.'
-    } else {
-      errorMessage = apiError?.message || 'Не удалось создать приглашение'
-    }
+    const errorMessage = status === 409
+      ? 'Приглашение для этого email уже существует. Удалите старое или используйте другой email.'
+      : getReadableErrorMessage(err, 'Не удалось создать приглашение')
     
     error.value = errorMessage
     toast.error('Ошибка', errorMessage)

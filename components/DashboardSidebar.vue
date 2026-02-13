@@ -1,11 +1,12 @@
 <template>
   <TooltipProvider :delay-duration="0">
   <aside
-    class="bg-white border-r border-slate-200 min-h-screen lg:relative fixed inset-y-0 left-0 z-50 transition-all duration-300 ease-in-out overflow-hidden"
+    v-bind="$attrs"
+    class="bg-white border-r border-slate-200 h-screen lg:h-full lg:relative fixed inset-y-0 left-0 z-50 transition-all duration-300 ease-in-out flex flex-col overflow-hidden"
     :class="[isCollapsed ? 'w-20' : 'w-64']"
   >
-    <!-- Logo Section -->
-    <div class="p-4 sm:p-6 border-b border-slate-200 overflow-hidden">
+    <!-- Top Section (Logo) -->
+    <div class="p-4 sm:p-6 border-b border-slate-200 shrink-0">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-3 shrink-0">
           <div class="w-10 h-10 sm:w-9 sm:h-9 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center shrink-0">
@@ -41,8 +42,8 @@
       </div>
     </div>
 
-    <!-- Navigation -->
-    <nav class="p-4 sm:p-3 overflow-y-auto max-h-[calc(100vh-200px)]">
+    <!-- Middle Section (Scrollable Navigation) -->
+    <nav class="flex-1 p-4 sm:p-3 overflow-y-auto min-h-0">
       <ul class="space-y-2">
         <!-- Back Button for Agent Detail -->
         <li v-if="isAgentDetail">
@@ -105,57 +106,80 @@
       </ul>
     </nav>
 
-    <!-- User Info -->
-    <div class="absolute bottom-0 left-0 right-0 border-t border-slate-200 bg-white overflow-hidden">
-      <!-- User Info -->
-      <div class="p-4 sm:p-5">
-        <!-- Logout button for collapsed sidebar -->
-        <div v-if="isCollapsed" class="flex justify-center mb-3">
-          <TooltipRoot>
-            <TooltipTrigger as-child>
-              <button
-                @click="handleLogout"
-                class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-              >
-                <LogOut class="h-5 w-5" />
-              </button>
-            </TooltipTrigger>
-            <TooltipPortal>
-              <TooltipContent side="right" :side-offset="8" class="z-[9999] rounded-md bg-white border border-slate-200 px-3 py-1.5 text-sm text-slate-700 shadow-md">
-                Выйти
-              </TooltipContent>
-            </TooltipPortal>
-          </TooltipRoot>
-        </div>
-
-        <!-- User info and logout button for expanded sidebar -->
-        <div v-else class="flex items-center justify-between">
-          <div class="flex items-center gap-3 shrink-0">
-            <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center shrink-0 shadow-sm">
-              <span class="text-white font-bold text-sm">
-                {{ user?.full_name ? user.full_name.split(' ').map(n => n.charAt(0)).join('').toUpperCase() : user?.email.charAt(0).toUpperCase() || 'U' }}
+    <!-- Bottom Section (User Info with Dropdown) -->
+    <div class="border-t border-slate-200 bg-white shrink-0 p-3">
+      <DropdownMenuRoot>
+        <DropdownMenuTrigger as-child>
+          <button
+            class="w-full flex items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-slate-100 focus:outline-none"
+            :class="[isCollapsed ? 'justify-center' : '']"
+          >
+            <div class="w-9 h-9 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center shrink-0 shadow-sm">
+              <span class="text-white font-bold text-xs">
+                {{ user?.full_name ? user.full_name.split(' ').map(n => n.charAt(0)).join('').toUpperCase() : user?.email?.charAt(0).toUpperCase() || 'U' }}
               </span>
             </div>
-            <div class="min-w-0 transition-opacity duration-300">
-              <p class="text-sm font-semibold text-slate-900 truncate">{{ user?.full_name || 'Пользователь' }}</p>
-              <p class="text-xs text-slate-600 truncate">{{ user?.role ? getRoleDisplayName(user.role) : 'Роль не указана' }}</p>
+            <div v-show="!isCollapsed" class="min-w-0 flex-1">
+              <p class="text-sm font-semibold text-slate-900 truncate leading-tight">{{ user?.full_name || 'Пользователь' }}</p>
+              <p class="text-xs text-slate-500 truncate leading-tight">{{ user?.email || 'Email не указан' }}</p>
             </div>
-          </div>
-          <button
-            @click="handleLogout"
-            class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
-            title="Выйти"
-          >
-            <LogOut class="h-5 w-5" />
+            <ChevronsUpDown v-show="!isCollapsed" class="h-4 w-4 text-slate-400 shrink-0" />
           </button>
-        </div>
-      </div>
+        </DropdownMenuTrigger>
+
+        <DropdownMenuPortal>
+          <DropdownMenuContent
+            :side="isCollapsed ? 'right' : 'top'"
+            :side-offset="8"
+            :align="isCollapsed ? 'end' : 'start'"
+            class="z-[9999] min-w-56 rounded-xl bg-white border border-slate-200 shadow-lg p-1"
+          >
+            <!-- User info header -->
+            <div class="flex items-center gap-3 px-3 py-2.5">
+              <div class="w-9 h-9 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center shrink-0">
+                <span class="text-white font-bold text-xs">
+                  {{ user?.full_name ? user.full_name.split(' ').map(n => n.charAt(0)).join('').toUpperCase() : user?.email?.charAt(0).toUpperCase() || 'U' }}
+                </span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-semibold text-slate-900 truncate">{{ user?.full_name || 'Пользователь' }}</p>
+                <p class="text-xs text-slate-500 truncate">{{ user?.email || 'Email не указан' }}</p>
+                <p class="text-xs text-indigo-600 font-medium mt-0.5">{{ user?.role ? getRoleDisplayName(user.role) : 'Роль не указана' }}</p>
+              </div>
+            </div>
+
+            <DropdownMenuSeparator class="h-px bg-slate-200 my-1" />
+
+            <DropdownMenuItem
+              class="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 rounded-lg cursor-pointer outline-none hover:bg-slate-100 focus:bg-slate-100 transition-colors"
+              @select="router.push('/settings')"
+            >
+              <Settings class="h-4 w-4 text-slate-400" />
+              Настройки
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator class="h-px bg-slate-200 my-1" />
+
+            <DropdownMenuItem
+              class="flex items-center gap-2 px-3 py-2 text-sm text-red-600 rounded-lg cursor-pointer outline-none hover:bg-red-50 focus:bg-red-50 transition-colors"
+              @select="handleLogout"
+            >
+              <LogOut class="h-4 w-4" />
+              Выйти
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenuPortal>
+      </DropdownMenuRoot>
     </div>
   </aside>
   </TooltipProvider>
 </template>
 
 <script setup lang="ts">
+defineOptions({
+  inheritAttrs: false
+})
+
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -175,7 +199,9 @@ import {
   Radio,
   Link,
   Database,
-  Cpu
+  Cpu,
+  Code,
+  ChevronsUpDown
 } from 'lucide-vue-next'
 import {
   TooltipRoot,
@@ -183,6 +209,12 @@ import {
   TooltipContent,
   TooltipPortal,
   TooltipProvider,
+  DropdownMenuRoot,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuPortal,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
 } from 'radix-vue'
 import { useAuth } from '../composables/useAuth'
 
@@ -269,11 +301,6 @@ const menuItems = [
     name: 'API Ключи',
     path: '/api-keys',
     icon: Key
-  },
-  {
-    name: 'Настройки',
-    path: '/settings',
-    icon: Settings
   }
 ]
 
@@ -282,6 +309,7 @@ const agentMenuItems = [
   { id: 'channels', name: 'Каналы', icon: Radio, path: (id: string) => `/agents/${id}/channels` },
   { id: 'connections', name: 'Интеграции', icon: Link, path: (id: string) => `/agents/${id}/connections` },
   { id: 'knowledge', name: 'База знаний', icon: Database, path: (id: string) => `/agents/${id}/knowledge` },
+  { id: 'functions', name: 'Функции', icon: Code, path: (id: string) => `/agents/${id}/functions` },
   { id: 'model', name: 'Модель', icon: Cpu, path: (id: string) => `/agents/${id}/model` },
   { id: 'chat', name: 'Чат', icon: MessageSquare, path: (id: string) => `/agents/${id}/chat` },
   { id: 'settings', name: 'Настройки', icon: Settings, path: (id: string) => `/agents/${id}/settings` },

@@ -2,6 +2,7 @@ import { onUnmounted, watch, type ComputedRef, unref } from 'vue'
 import { useDialogs } from './useDialogs'
 import { useMessages } from './useMessages'
 import { EventSourcePolyfill } from 'event-source-polyfill'
+import { getStoredAccessToken } from '~/composables/authSessionManager'
 
 /**
  * @deprecated Use useAgentWebSocket instead.
@@ -21,7 +22,11 @@ export const useAgentEvents = (agentId: string | null | ComputedRef<string | nul
     // Close previous connection if it exists
     disconnect()
 
-    const token = localStorage.getItem('auth_token')
+    const token = getStoredAccessToken()
+    if (!token) {
+      console.warn('[SSE] Отсутствует токен авторизации')
+      return
+    }
     const url = `/api/v1/agents/${id}/dialogs/events`
 
     console.log(`[SSE] Connecting to ${url}`)
@@ -30,6 +35,7 @@ export const useAgentEvents = (agentId: string | null | ComputedRef<string | nul
       headers: {
         'Authorization': `Bearer ${token}`
       },
+      withCredentials: true,
       heartbeatTimeout: 60000 // 1 minute
     })
 

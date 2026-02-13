@@ -8,6 +8,21 @@
       @back="$emit('back')"
     />
 
+    <!-- Error Banner -->
+    <div
+      v-if="messagesError"
+      class="px-4 py-2 bg-red-50 border-b border-red-200 text-red-700 text-sm flex items-center gap-2"
+    >
+      <span class="font-medium">Ошибка загрузки:</span>
+      <span>{{ messagesError }}</span>
+      <button
+        @click="loadMessages"
+        class="ml-auto text-red-600 hover:text-red-800 underline text-xs"
+      >
+        Повторить
+      </button>
+    </div>
+
     <!-- Messages Feed -->
     <MessagesFeed
       :dialog-id="dialogId"
@@ -62,6 +77,7 @@ const {
   isLoading,
   isSending,
   isStreaming,
+  error: messagesError,
   dialogHasMore
 } = useMessages()
 
@@ -75,7 +91,9 @@ const isAgentEnabled = computed(() => (currentDialog.value?.agent_status ?? 'act
 
 // Load messages on mount and dialog change
 const loadMessages = async () => {
+  console.log('[ChatArea] loadMessages for dialog:', props.dialogId, 'agent:', props.agent.id)
   await fetchMessages(props.agent.id, props.dialogId, { limit: 50 })
+  console.log('[ChatArea] Messages loaded, count:', messages.value.length, 'error:', messagesError.value)
   markAsRead(props.dialogId)
 }
 

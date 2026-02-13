@@ -2,6 +2,8 @@ import { ref, reactive, readonly } from 'vue'
 import type { Message, MessageRole, MessageStatus, MessageType, MessagesListResponse, SendMessageData, SendManagerMessageData } from '../types/dialogs'
 import { useApiFetch } from './useApiFetch'
 import { useDialogs } from './useDialogs'
+import { getStoredAccessToken } from '~/composables/authSessionManager'
+import { getReadableErrorMessage } from '~/utils/api-errors'
 
 // State per dialog - using reactive for better dynamic key tracking
 const messagesMap = reactive<Record<string, Message[]>>({})
@@ -179,19 +181,25 @@ export const useMessages = () => {
     error.value = null
     let responseHasMore = false
 
-    try {
-      const params = new URLSearchParams()
-      if (options?.before) params.set('before', options.before)
-      if (options?.limit) params.set('limit', String(options.limit))
-      
-      const queryString = params.toString()
-      // URL-encode dialogId to handle special characters like ':'
-      const encodedDialogId = encodeURIComponent(dialogId)
-      const url = `agents/${agentId}/dialogs/${encodedDialogId}/messages${queryString ? `?${queryString}` : ''}`
+    const params = new URLSearchParams()
+    if (options?.before) params.set('before', options.before)
+    if (options?.limit) params.set('limit', String(options.limit))
+    
+    const queryString = params.toString()
+    // URL-encode dialogId to handle special characters like ':'
+    const encodedDialogId = encodeURIComponent(dialogId)
+    const url = `agents/${agentId}/dialogs/${encodedDialogId}/messages${queryString ? `?${queryString}` : ''}`
 
+    try {
+
+      console.log('[useMessages] fetchMessages URL:', url)
+      
       const response = await apiFetch<MessagesListResponse | Message[]>(url, {
         method: 'GET'
       })
+      
+      console.log('[useMessages] fetchMessages raw response:', response)
+      console.log('[useMessages] fetchMessages response type:', typeof response, Array.isArray(response) ? 'array' : '')
       
       // Handle both response formats: {messages: [...], has_more: bool} or direct array [...]
       let rawMessages: any[] = []
@@ -212,10 +220,27 @@ export const useMessages = () => {
         console.error('[useMessages] Unexpected response format:', response)
       }
 
-      // Normalize messages
-      const messagesList = rawMessages
-        .map(message => normalizeMessage(message, dialogId))
-        .filter((msg): msg is Message => msg !== null)
+      console.log('[useMessages] rawMessages count:', rawMessages.length)
+      if (rawMessages.length > 0) {
+        console.log('[useMessages] first raw message sample:', rawMessages[0])
+      }
+
+      // Normalize messages (with debug logging for filtered messages)
+      const messagesList: Message[] = []
+      for (const message of rawMessages) {
+        const normalized = normalizeMessage(message, dialogId)
+        if (normalized) {
+          messagesList.push(normalized)
+        } else {
+          console.warn('[useMessages] Message filtered out by normalizeMessage:', {
+            id: message?.id,
+            role: message?.role ?? message?.sender,
+            type: message?.type ?? message?.message_type,
+            content_type: typeof message?.content,
+            content_preview: typeof message?.content === 'string' ? message.content.slice(0, 80) : typeof message?.content
+          })
+        }
+      }
       const existingMessages = messagesMap[dialogId] || []
       
       if (options?.before) {
@@ -225,9 +250,16 @@ export const useMessages = () => {
       }
 
       hasMore.value.set(dialogId, responseHasMore)
+      console.log('[useMessages] Final messages count for dialog', dialogId, ':', (messagesMap[dialogId] || []).length)
     } catch (err: any) {
-      const msg = err?.data?.detail ?? err?.data?.message ?? err?.message ?? 'Не удалось загрузить сообщения'
-      error.value = typeof msg === 'string' ? msg : JSON.stringify(msg)
+      console.error('[useMessages] fetchMessages error:', err)
+      console.error('[useMessages] fetchMessages error details:', {
+        status: err?.statusCode || err?.status,
+        data: err?.data,
+        message: err?.message,
+        url
+      })
+      error.value = getReadableErrorMessage(err, 'Не удалось загрузить сообщения')
     } finally {
       isLoading.value = false
     }
@@ -304,13 +336,12 @@ export const useMessages = () => {
         updatedMessages[index] = { 
           ...updatedMessages[index], 
           status: 'failed',
-          error_message: err?.message || 'Ошибка отправки'
+          error_message: getReadableErrorMessage(err, 'Ошибка отправки')
         }
         setMessages(dialogId, updatedMessages)
       }
 
-      const msg = err?.data?.detail ?? err?.data?.message ?? err?.message ?? 'Не удалось отправить сообщение'
-      error.value = typeof msg === 'string' ? msg : JSON.stringify(msg)
+      error.value = getReadableErrorMessage(err, 'Не удалось отправить сообщение')
       return null
     } finally {
       isSending.value = false
@@ -397,13 +428,12 @@ export const useMessages = () => {
         updatedMessages[index] = {
           ...updatedMessages[index],
           status: 'failed',
-          error_message: err?.message || 'Ошибка отправки'
+          error_message: getReadableErrorMessage(err, 'Ошибка отправки')
         }
         setMessages(dialogId, updatedMessages)
       }
 
-      const msg = err?.data?.detail ?? err?.data?.message ?? err?.message ?? 'Не удалось отправить сообщение менеджера'
-      error.value = typeof msg === 'string' ? msg : JSON.stringify(msg)
+      error.value = getReadableErrorMessage(err, 'Не удалось отправить сообщение менеджера')
       return null
     } finally {
       isSending.value = false
@@ -465,6 +495,7 @@ export const useMessages = () => {
    * Mark optimistic message as failed
    */
   const markMessageFailed = (dialogId: string, tempId: string, errorMessage?: string) => {
+    const readableMsg = errorMessage || 'Не удалось отправить сообщение'
     const messages = messagesMap[dialogId] || []
     const index = messages.findIndex(m => m.id === tempId)
     
@@ -473,13 +504,13 @@ export const useMessages = () => {
       updatedMessages[index] = {
         ...updatedMessages[index],
         status: 'failed',
-        error_message: errorMessage || 'Ошибка отправки'
+        error_message: readableMsg
       }
       setMessages(dialogId, updatedMessages)
     }
     
     isSending.value = false
-    error.value = errorMessage || 'Ошибка отправки'
+    error.value = readableMsg
   }
 
   /**
@@ -581,11 +612,12 @@ export const useMessages = () => {
 
     try {
       // Get auth token
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
+      const token = getStoredAccessToken()
       
       const encodedDialogId = encodeURIComponent(dialogId)
       const response = await fetch(`/api/v1/agents/${agentId}/dialogs/${encodedDialogId}/messages/stream`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'text/event-stream',
@@ -595,7 +627,7 @@ export const useMessages = () => {
       })
 
       if (!response.ok) {
-        throw new Error(`Stream error: ${response.status}`)
+        throw new Error(getReadableErrorMessage({ status: response.status }, 'Не удалось получить ответ агента'))
       }
 
       const reader = response.body?.getReader()
@@ -684,7 +716,7 @@ export const useMessages = () => {
       }
 
       updateDialogStatus(dialogId, 'ERROR')
-      error.value = err?.message || 'Ошибка получения ответа агента'
+      error.value = getReadableErrorMessage(err, 'Не удалось получить ответ агента')
     } finally {
       isStreaming.value = false
       streamingMessageId.value = null

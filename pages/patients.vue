@@ -1,13 +1,13 @@
 <template>
-  <div class="min-h-screen bg-slate-50">
+  <div class="h-screen flex flex-col bg-slate-50 overflow-hidden">
     <!-- Mobile Header -->
-    <div class="lg:hidden bg-white border-b border-slate-200 px-4 py-3">
+    <div class="lg:hidden bg-white border-b border-slate-200 px-4 py-3 shrink-0">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
           <div class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-            <span class="text-white font-bold text-xs">М</span>
+            <span class="text-white font-bold text-xs">{{ tenant?.name ? tenant.name.charAt(0).toUpperCase() : 'О' }}</span>
           </div>
-          <span class="text-slate-900 font-bold">МедиАИ</span>
+          <span class="text-slate-900 font-bold">{{ tenant?.name || 'Организация' }}</span>
         </div>
         <button
           @click="isSidebarOpen = !isSidebarOpen"
@@ -18,9 +18,9 @@
       </div>
     </div>
 
-    <div class="flex">
+    <div class="flex flex-1 min-h-0">
       <!-- Desktop Sidebar -->
-      <DashboardSidebar class="hidden lg:block" />
+      <DashboardSidebar class="hidden lg:flex" />
 
       <!-- Mobile Sidebar Overlay -->
       <transition
@@ -56,7 +56,7 @@
       </transition>
 
       <!-- Main Content -->
-      <main class="flex-1 bg-slate-50 p-4 sm:p-6 lg:p-10">
+      <main class="flex-1 min-w-0 bg-slate-50 overflow-y-auto p-4 sm:p-6 lg:p-10">
         <div class="max-w-7xl mx-auto">
           <!-- Auth Status Banner -->
           <div v-if="!isAuthenticated" class="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
@@ -144,7 +144,7 @@ import { useAuth } from '../composables/useAuth'
 const isSidebarOpen = ref(false)
 
 // Auth state
-const { isAuthenticated } = useAuth()
+const { isAuthenticated, tenant } = useAuth()
 const showAuthModal = ref(false)
 
 // Auth handler

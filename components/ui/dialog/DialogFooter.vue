@@ -1,9 +1,15 @@
+<script setup lang="ts">
+import type { HTMLAttributes } from "vue"
+import { cn } from '~/lib/utils'
+
+const props = defineProps<{ class?: HTMLAttributes["class"] }>()
+</script>
+
 <template>
-  <div :class="['flex items-center justify-end gap-3 pt-4', className]">
+  <div
+    data-slot="dialog-footer"
+    :class="cn('flex flex-col-reverse gap-2 sm:flex-row sm:justify-end', props.class)"
+  >
     <slot />
   </div>
 </template>
-
-<script setup lang="ts">
-defineProps<{ className?: string }>()
-</script>

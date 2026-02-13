@@ -149,8 +149,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { Play, Pause, Check, Loader2, AlertCircle } from 'lucide-vue-next'
-import MarkdownIt from 'markdown-it'
 import type { Message } from '../../types/dialogs'
+import { createSafeMarkdownRenderer } from '~/utils/safe-markdown'
 
 const props = defineProps<{
   message: Message
@@ -162,8 +162,7 @@ defineEmits<{
 }>()
 
 // Markdown renderer
-const md = new MarkdownIt({
-  html: false,
+const md = createSafeMarkdownRenderer({
   linkify: true,
   breaks: true
 })

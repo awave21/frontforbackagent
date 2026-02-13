@@ -8,11 +8,13 @@ import { useDirectories } from '~/composables/useDirectories'
 import { useSystemPromptHistory } from '~/composables/useSystemPromptHistory'
 import { useAgentSession } from '~/composables/useAgentSession'
 import { useToast } from '~/composables/useToast'
+import { getReadableErrorMessage } from '~/utils/api-errors'
 
 type AgentForm = {
   name: string
   system_prompt: string
   model: string
+  timezone: string
   status: AgentStatus
   llm_params: {
     temperature: number
@@ -57,6 +59,7 @@ const createEmptyForm = (): AgentForm => ({
   name: '',
   system_prompt: '',
   model: '',
+  timezone: 'Europe/Moscow',
   status: 'draft',
   llm_params: {
     temperature: 0.7,
@@ -68,6 +71,7 @@ const buildForm = (agent: Agent): AgentForm => ({
   name: agent.name,
   system_prompt: agent.system_prompt,
   model: agent.model,
+  timezone: agent.timezone ?? 'Europe/Moscow',
   status: agent.status,
   llm_params: {
     temperature: agent.llm_params?.temperature ?? 0.7,
@@ -201,7 +205,7 @@ export const useAgentEditorStore = defineStore('agentEditor', () => {
       form.value = buildForm(data)
       isLoaded.value = true
     } catch (err: any) {
-      error.value = err.message || 'Не удалось загрузить агента'
+      error.value = getReadableErrorMessage(err, 'Не удалось загрузить агента')
     } finally {
       isLoading.value = false
     }
@@ -220,7 +224,7 @@ export const useAgentEditorStore = defineStore('agentEditor', () => {
       }
       return true
     } catch (err: any) {
-      toastError('Ошибка сохранения', err.message || 'Не удалось сохранить изменения')
+      toastError('Ошибка сохранения', getReadableErrorMessage(err, 'Не удалось сохранить изменения'))
       return false
     } finally {
       isSaving.value = false
@@ -287,7 +291,7 @@ export const useAgentEditorStore = defineStore('agentEditor', () => {
       await deleteAgent(agent.value.id)
       return true
     } catch (err: any) {
-      toastError('Ошибка удаления', err.message || 'Не удалось удалить агента')
+      toastError('Ошибка удаления', getReadableErrorMessage(err, 'Не удалось удалить агента'))
       return false
     } finally {
       isDeleting.value = false
@@ -402,7 +406,7 @@ export const useAgentEditorStore = defineStore('agentEditor', () => {
         sqnsStatusLoaded.value = true
         return
       }
-      sqnsError.value = err.message || 'Не удалось загрузить статус SQNS'
+      sqnsError.value = getReadableErrorMessage(err, 'Не удалось загрузить статус SQNS')
     }
   }
 
@@ -425,7 +429,7 @@ export const useAgentEditorStore = defineStore('agentEditor', () => {
       if (err?.statusCode === 400 || err?.statusCode === 404) {
         return
       }
-      sqnsError.value = err.message || 'Не удалось загрузить подсказки SQNS'
+      sqnsError.value = getReadableErrorMessage(err, 'Не удалось загрузить подсказки SQNS')
     }
   }
 
@@ -446,7 +450,7 @@ export const useAgentEditorStore = defineStore('agentEditor', () => {
       await loadSqnsStatusForAgent()
       return true
     } catch (err: any) {
-      sqnsError.value = err.message || 'Ошибка включения SQNS'
+      sqnsError.value = getReadableErrorMessage(err, 'Не удалось включить интеграцию SQNS')
       return false
     }
   }
@@ -461,7 +465,7 @@ export const useAgentEditorStore = defineStore('agentEditor', () => {
       await loadSqnsStatusForAgent()
       return true
     } catch (err: any) {
-      sqnsError.value = err.message || 'Ошибка отключения SQNS'
+      sqnsError.value = getReadableErrorMessage(err, 'Не удалось отключить интеграцию SQNS')
       return false
     }
   }
@@ -559,7 +563,7 @@ export const useAgentEditorStore = defineStore('agentEditor', () => {
             tokens,
             tools_called: toolsCalled
           })
-          toastError('Ошибка выполнения агента', response.error_message)
+          toastError('Ошибка выполнения агента', getReadableErrorMessage({ message: response.error_message }, 'Агент не смог обработать запрос'))
         } else {
           messages.value.push({
             role: 'agent',
@@ -733,6 +737,18 @@ export const useAgentEditorStore = defineStore('agentEditor', () => {
         if (newStatus === agent.value.status) return
         
         await autoSaveField({ status: newStatus })
+      }
+    )
+
+    // Auto-save timezone immediately
+    watch(
+      () => form.value.timezone,
+      async (newTimezone, oldTimezone) => {
+        if (!agent.value || !isLoaded.value) return
+        if (newTimezone === oldTimezone) return
+        if (newTimezone === (agent.value.timezone ?? 'Europe/Moscow')) return
+        
+        await autoSaveField({ timezone: newTimezone })
       }
     )
 

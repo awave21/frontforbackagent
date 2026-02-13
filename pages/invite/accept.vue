@@ -146,6 +146,8 @@ import { AlertCircle, CheckCircle, Loader2, Eye, EyeOff } from 'lucide-vue-next'
 import { useAuth, type AuthTokenResponse } from '../../composables/useAuth'
 import { useApiFetch } from '../../composables/useApiFetch'
 import { useToast } from '../../composables/useToast'
+import { setStoredAccessToken } from '../../composables/authSessionManager'
+import { getReadableErrorMessage } from '~/utils/api-errors'
 
 // No auth middleware - this is a public page
 const route = useRoute()
@@ -239,16 +241,7 @@ const handleAccept = async () => {
     // Save auth data
     if (response.token) {
       if (process.client) {
-        localStorage.setItem('auth_token', response.token)
-        if (response.refresh_token) {
-          localStorage.setItem('auth_refresh_token', response.refresh_token)
-        }
-        if (response.user) {
-          localStorage.setItem('auth_user', JSON.stringify(response.user))
-        }
-        if (response.tenant) {
-          localStorage.setItem('auth_tenant', JSON.stringify(response.tenant))
-        }
+        setStoredAccessToken(response.token)
       }
 
       // Update auth state
@@ -256,8 +249,7 @@ const handleAccept = async () => {
         email: response.user?.email || '',
         password: form.value.password
       }).catch(() => {
-        // If login fails, we still have tokens in localStorage
-        // The auth system will pick them up
+        // Если повторный login не сработал, access token уже сохранен в памяти.
       })
 
       success.value = true
@@ -271,13 +263,12 @@ const handleAccept = async () => {
       throw new Error('Не получен токен авторизации')
     }
   } catch (err: any) {
-    const apiError = err?.apiError || err
     const status = err?.status || err?.statusCode || err?.response?.status
 
     if (status === 400 || status === 404 || status === 410) {
-      tokenError.value = apiError?.message || 'Ссылка приглашения недействительна или истекла'
+      tokenError.value = getReadableErrorMessage(err, 'Ссылка приглашения недействительна или истекла')
     } else {
-      error.value = apiError?.message || 'Не удалось завершить регистрацию'
+      error.value = getReadableErrorMessage(err, 'Не удалось завершить регистрацию')
       toast.error('Ошибка', error.value)
     }
   } finally {

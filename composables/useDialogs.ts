@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import type { Dialog, DialogAgentStatus, CreateDialogData, UpdateDialogData, DialogsListResponse } from '../types/dialogs'
 import { useApiFetch } from './useApiFetch'
+import { getReadableErrorMessage } from '~/utils/api-errors'
 
 const AGENT_STATUSES = new Set<string>(['active', 'paused'])
 
@@ -74,8 +75,7 @@ export const useDialogs = () => {
         data: err?.data,
         message: err?.message
       })
-      const msg = err?.data?.detail ?? err?.data?.message ?? err?.message ?? 'Не удалось загрузить диалоги'
-      error.value = typeof msg === 'string' ? msg : JSON.stringify(msg)
+      error.value = getReadableErrorMessage(err, 'Не удалось загрузить диалоги')
       dialogs.value = []
     } finally {
       isLoading.value = false
@@ -103,8 +103,7 @@ export const useDialogs = () => {
       dialogs.value = [normalized, ...dialogs.value]
       return normalized
     } catch (err: any) {
-      const msg = err?.data?.detail ?? err?.data?.message ?? err?.message ?? 'Не удалось создать диалог'
-      error.value = typeof msg === 'string' ? msg : JSON.stringify(msg)
+      error.value = getReadableErrorMessage(err, 'Не удалось создать диалог')
       return null
     } finally {
       isLoading.value = false
@@ -133,8 +132,7 @@ export const useDialogs = () => {
 
       return normalized
     } catch (err: any) {
-      const msg = err?.data?.detail ?? err?.data?.message ?? err?.message ?? 'Не удалось обновить диалог'
-      error.value = typeof msg === 'string' ? msg : JSON.stringify(msg)
+      error.value = getReadableErrorMessage(err, 'Не удалось обновить диалог')
       return null
     }
   }
@@ -154,8 +152,7 @@ export const useDialogs = () => {
       dialogs.value = dialogs.value.filter(d => d.id !== dialogId)
       return true
     } catch (err: any) {
-      const msg = err?.data?.detail ?? err?.data?.message ?? err?.message ?? 'Не удалось удалить диалог'
-      error.value = typeof msg === 'string' ? msg : JSON.stringify(msg)
+      error.value = getReadableErrorMessage(err, 'Не удалось удалить диалог')
       return false
     }
   }
@@ -196,8 +193,7 @@ export const useDialogs = () => {
       if (idx !== -1) {
         dialogs.value[idx] = { ...dialogs.value[idx], agent_status: currentStatus }
       }
-      const msg = err?.data?.detail ?? err?.data?.message ?? err?.message ?? 'Не удалось изменить статус агента'
-      error.value = typeof msg === 'string' ? msg : JSON.stringify(msg)
+      error.value = getReadableErrorMessage(err, 'Не удалось изменить статус агента')
       console.error('[useDialogs] toggleDialogAgentStatus error:', err)
       return null
     }

@@ -1,15 +1,15 @@
 <template>
-  <div class="min-h-screen bg-slate-50">
+  <div class="h-screen flex flex-col bg-slate-50 overflow-hidden">
     <!-- Mobile Header -->
-    <div class="lg:hidden bg-white border-b border-slate-200 px-4 py-3">
+    <div class="lg:hidden bg-white border-b border-slate-200 px-4 py-3 shrink-0">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
           <div
             class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center"
           >
-            <span class="text-white font-bold text-xs">М</span>
+            <span class="text-white font-bold text-xs">{{ tenant?.name ? tenant.name.charAt(0).toUpperCase() : 'О' }}</span>
           </div>
-          <span class="text-slate-900 font-bold">МедиАИ</span>
+          <span class="text-slate-900 font-bold">{{ tenant?.name || 'Организация' }}</span>
         </div>
         <button
           @click="isSidebarOpen = !isSidebarOpen"
@@ -20,9 +20,9 @@
       </div>
     </div>
 
-    <div class="flex">
+    <div class="flex flex-1 min-h-0">
       <!-- Desktop Sidebar -->
-      <DashboardSidebar class="hidden lg:block" />
+      <DashboardSidebar class="hidden lg:flex" />
 
       <!-- Mobile Sidebar Overlay -->
       <div
@@ -46,7 +46,7 @@
       </transition>
 
       <!-- Main Content -->
-      <main class="flex-1 bg-slate-50 p-4 sm:p-6 lg:p-10">
+      <main class="flex-1 min-w-0 bg-slate-50 overflow-y-auto p-4 sm:p-6 lg:p-10">
         <div class="max-w-7xl mx-auto">
           <!-- Auth Status Banner -->
           <div v-if="!isAuthenticated" class="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
@@ -165,7 +165,7 @@
             </NuxtLink>
           </div>
 
-          <div v-else class="space-y-4">
+          <div v-else class="space-y-5">
             <AgentDetailCard
               v-for="agent in agents"
               :key="agent.id"
@@ -178,6 +178,7 @@
               :stats-bg-color="getAgentStatsBgColor(agent)"
               :stats-text-color="getAgentStatsTextColor(agent)"
               :stats="getAgentStats(agent)"
+              :status="agent.status"
             />
           </div>
         </div>
@@ -227,7 +228,7 @@ const isSidebarOpen = ref(false);
 const router = useRouter();
 
 // Auth state
-const { isAuthenticated } = useAuth();
+const { isAuthenticated, tenant } = useAuth();
 
 // Permissions
 const { canEditAgents } = usePermissions();
@@ -325,6 +326,37 @@ const getAgentStatsTextColor = (agent: Agent) => {
   return colors[index]
 }
 
+const parseCostAmount = (value: string | undefined) => {
+  const amount = Number(value ?? 0)
+  return Number.isFinite(amount) ? amount : 0
+}
+
+const formatCost = (value: string | undefined, currency: 'USD' | 'RUB') => {
+  const safeAmount = parseCostAmount(value)
+  const maxFractionDigits = safeAmount !== 0 && Math.abs(safeAmount) < 1 ? 4 : 2
+
+  if (currency === 'USD') {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: maxFractionDigits
+    }).format(safeAmount)
+  }
+
+  return new Intl.NumberFormat('ru-RU', {
+    style: 'currency',
+    currency: 'RUB',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: maxFractionDigits
+  }).format(safeAmount)
+}
+
+const formatExactCostTooltip = (value: string | undefined, currency: 'USD' | 'RUB') => {
+  const rawValue = typeof value === 'string' && value.trim() ? value.trim() : '0'
+  return `Точное значение: ${rawValue} ${currency}`
+}
+
 const getAgentStats = (agent: Agent) => {
   // Real data from agent
   const statusLabel = agent.status === 'published' ? 'Опубликован' : 'Черновик';
@@ -334,7 +366,17 @@ const getAgentStats = (agent: Agent) => {
     { value: statusLabel, label: 'Статус' },
     { value: modelName, label: 'Модель' },
     { value: agent.version?.toString() || '1', label: 'Версия' },
-    { value: new Date(agent.updated_at).toLocaleDateString('ru-RU'), label: 'Обновлен' }
+    { value: new Date(agent.updated_at).toLocaleDateString('ru-RU'), label: 'Обновлен' },
+    {
+      value: formatCost(agent.total_cost_usd, 'USD'),
+      label: 'Расход USD',
+      tooltip: formatExactCostTooltip(agent.total_cost_usd, 'USD')
+    },
+    {
+      value: formatCost(agent.total_cost_rub, 'RUB'),
+      label: 'Расход RUB',
+      tooltip: formatExactCostTooltip(agent.total_cost_rub, 'RUB')
+    }
   ]
 }
 </script>

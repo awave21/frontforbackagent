@@ -23,32 +23,37 @@
           :disabled="!canEditAgents"
           class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-md focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all appearance-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          <optgroup label="GPT-5 (Рекомендуемые - 2026)">
-            <option value="openai:gpt-5.2">GPT-5.2 (Лучшая для кодинга и агентов)</option>
-            <option value="openai:gpt-5.2-pro">GPT-5.2 Pro (Умнее и точнее)</option>
-            <option value="openai:gpt-5-mini">GPT-5 Mini (Быстрая, экономная)</option>
-            <option value="openai:gpt-5-nano">GPT-5 Nano (Самая быстрая)</option>
-            <option value="openai:gpt-5.1">GPT-5.1 (Предыдущее поколение)</option>
-            <option value="openai:gpt-5">GPT-5 (Стабильная)</option>
-          </optgroup>
-          
-          <optgroup label="GPT-4.1 (Не-reasoning модели)">
-            <option value="openai:gpt-4.1">GPT-4.1 (Умная, без рассуждений)</option>
-            <option value="openai:gpt-4.1-mini">GPT-4.1 Mini (Быстрая)</option>
-            <option value="openai:gpt-4.1-nano">GPT-4.1 Nano (Экономная)</option>
-          </optgroup>
-          
-          <optgroup label="GPT-4o (Легаси)">
-            <option value="openai:gpt-4o">GPT-4o (Мультимодальная)</option>
-            <option value="openai:gpt-4o-mini">GPT-4o Mini (Быстрая, дешевая)</option>
-          </optgroup>
-          
-          <optgroup label="Reasoning модели">
-            <option value="openai:o3">o3 (Сложные задачи)</option>
-            <option value="openai:o3-pro">o3 Pro (Больше вычислений)</option>
-            <option value="openai:o4-mini">o4 Mini (Быстрые рассуждения)</option>
+          <option v-if="isLoadingActiveModels && !modelGroups.length" value="" disabled>
+            Загрузка моделей...
+          </option>
+          <option v-else-if="activeModelsError && !modelGroups.length" value="" disabled>
+            Не удалось загрузить модели
+          </option>
+          <option v-else-if="!modelGroups.length" value="" disabled>
+            Нет доступных моделей
+          </option>
+
+          <option v-if="currentModelUnavailable" :value="form.model">
+            {{ `${form.model} (неактивна)` }}
+          </option>
+
+          <optgroup
+            v-for="group in modelGroups"
+            :key="group.group"
+            :label="group.group"
+          >
+            <option
+              v-for="option in group.options"
+              :key="option.value"
+              :value="option.value"
+            >
+              {{ option.label }}
+            </option>
           </optgroup>
         </select>
+        <p v-if="activeModelsError" class="mt-2 text-xs text-rose-600">
+          {{ activeModelsError }}
+        </p>
       </div>
 
       <div>
@@ -98,12 +103,29 @@
 </template>
 
 <script setup lang="ts">
+import { computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { Check, Cpu, Database, Loader2, Settings } from 'lucide-vue-next'
 import { usePermissions } from '~/composables/usePermissions'
 import { useAgentEditorStore } from '~/composables/useAgentEditorStore'
+import { useActiveModels } from '~/composables/useActiveModels'
 
 const store = useAgentEditorStore()
 const { form } = storeToRefs(store)
 const { canEditAgents } = usePermissions()
+const {
+  modelGroups,
+  isLoading: isLoadingActiveModels,
+  error: activeModelsError,
+  fetchActiveModels,
+  hasModelValue
+} = useActiveModels()
+
+const currentModelUnavailable = computed(
+  () => Boolean(form.value.model) && !hasModelValue(form.value.model)
+)
+
+onMounted(async () => {
+  await fetchActiveModels()
+})
 </script>

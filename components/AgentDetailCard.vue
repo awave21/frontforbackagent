@@ -1,64 +1,87 @@
 <template>
-  <div class="bg-white rounded-xl border p-7" :class="borderColor">
+  <div class="group bg-white rounded-2xl border border-slate-200 p-6 hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300 hover:-translate-y-1">
+    <!-- Header Section -->
     <div class="flex items-start justify-between mb-6">
-      <div class="flex items-center gap-5">
+      <div class="flex items-start gap-4 flex-1 min-w-0">
+        <!-- Avatar with Gradient -->
         <div
-          class="flex items-center justify-center w-18 h-18 rounded-xl bg-gradient-to-br"
+          class="relative flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br shrink-0 shadow-lg"
           :class="avatarColor"
         >
-          <component :is="iconComponent" class="h-9 w-9 text-white" />
+          <Bot class="h-8 w-8 text-white" />
+          <div class="absolute -bottom-2 -right-2 w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-md">
+            <div
+              class="w-3 h-3 rounded-full"
+              :class="status === 'published' ? 'bg-emerald-500' : 'bg-amber-500'"
+            ></div>
+          </div>
         </div>
-        <div>
-          <h3 class="text-2xl font-bold text-slate-900 mb-2">
+
+        <!-- Title and Meta -->
+        <div class="flex-1 min-w-0">
+          <h3 class="text-xl font-bold text-slate-900 mb-2 truncate group-hover:text-indigo-600 transition-colors">
             {{ title }}
           </h3>
-          <div class="flex items-center gap-3">
-            <div class="flex items-center gap-1.5">
-              <div
-                class="w-2.5 h-2.5 bg-green-500 rounded-full"
-              ></div>
-              <span class="text-sm font-semibold text-green-600"
-                >Активен</span
-              >
-            </div>
-            <div class="w-1 h-1 bg-slate-300 rounded-full"></div>
-            <span class="text-sm text-slate-600"
-              >{{ type }}</span
+          <div class="flex items-center flex-wrap gap-2">
+            <!-- Status Badge -->
+            <span
+              class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold"
+              :class="[
+                status === 'published'
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : 'bg-amber-50 text-amber-700'
+              ]"
             >
+              <div
+                class="w-1.5 h-1.5 rounded-full"
+                :class="status === 'published' ? 'bg-emerald-500' : 'bg-amber-500'"
+              ></div>
+              {{ status === 'published' ? 'Активен' : 'Черновик' }}
+            </span>
+
+            <!-- Type Badge -->
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700">
+              <Sparkles class="h-3 w-3" />
+              {{ type }}
+            </span>
           </div>
         </div>
       </div>
-      <div class="flex items-center gap-2">
+
+      <!-- Action Buttons -->
+      <div class="flex items-center gap-2 shrink-0 ml-4">
         <button
           v-if="agentId"
           @click="navigateToAgent"
-          class="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-lg text-slate-900 font-medium hover:bg-slate-100 transition-colors"
+          class="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-600 hover:to-purple-700 transition-all shadow-sm hover:shadow-md"
         >
           <Settings class="h-4 w-4" />
-          Настроить
+          <span class="hidden sm:inline">Настроить</span>
         </button>
         <button
-          v-else
-          class="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-lg text-slate-900 font-medium"
+          class="p-2.5 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors group/menu"
+          @click.stop="toggleMenu"
         >
-          <Settings class="h-4 w-4" />
-          Настроить
-        </button>
-        <button class="p-3 bg-slate-50 rounded-lg">
-          <MoreVerticalIcon class="h-5 w-5 text-slate-600" />
+          <MoreVerticalIcon class="h-5 w-5 text-slate-600 group-hover/menu:text-slate-900" />
         </button>
       </div>
     </div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
       <div
         v-for="stat in stats"
         :key="stat.label"
-        class="rounded-lg p-4"
-        :class="statsBgColor"
+        class="group/stat relative rounded-xl p-3 bg-gradient-to-br from-slate-50 to-slate-100/50 hover:from-indigo-50 hover:to-purple-50 transition-all duration-300 cursor-default border border-slate-100 hover:border-indigo-200"
+        :title="stat.tooltip || undefined"
       >
-        <p class="text-3xl font-bold mb-1" :class="statsTextColor">{{ stat.value }}</p>
-        <p class="text-sm text-slate-600">{{ stat.label }}</p>
+        <p class="text-sm font-bold text-slate-900 mb-0.5 truncate group-hover/stat:text-indigo-600 transition-colors">
+          {{ stat.value }}
+        </p>
+        <p class="text-xs text-slate-500 font-medium">{{ stat.label }}</p>
+        
+        <!-- Hover indicator -->
+        <div class="absolute inset-0 rounded-xl ring-2 ring-indigo-400 opacity-0 group-hover/stat:opacity-20 transition-opacity pointer-events-none"></div>
       </div>
     </div>
   </div>
@@ -68,11 +91,12 @@
 import { computed } from 'vue'
 // @ts-ignore - navigateTo is auto-imported in Nuxt 3
 import { navigateTo } from '#app'
-import { UserCheck, Activity, FileCheck, Settings, MoreVerticalIcon } from 'lucide-vue-next'
+import { Bot, Settings, MoreVerticalIcon, Sparkles } from 'lucide-vue-next'
 
 interface Stat {
   value: string
   label: string
+  tooltip?: string
 }
 
 interface Props {
@@ -85,26 +109,21 @@ interface Props {
   statsBgColor: string
   statsTextColor: string
   agentId?: string
+  status?: 'published' | 'draft'
 }
 
-const props = defineProps<Props>()
-
-const iconComponent = computed(() => {
-  switch (props.icon) {
-    case 'UserCheck':
-      return UserCheck
-    case 'Activity':
-      return Activity
-    case 'FileCheck':
-      return FileCheck
-    default:
-      return UserCheck
-  }
+const props = withDefaults(defineProps<Props>(), {
+  status: 'draft'
 })
 
 const navigateToAgent = () => {
   if (props.agentId) {
     navigateTo(`/agents/${props.agentId}`)
   }
+}
+
+const toggleMenu = () => {
+  // Placeholder for menu toggle functionality
+  console.log('Menu toggled')
 }
 </script>

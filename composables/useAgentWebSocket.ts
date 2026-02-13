@@ -1,6 +1,7 @@
 import { ref, watch, onUnmounted, computed, type ComputedRef, unref } from 'vue'
 import { useDialogs } from './useDialogs'
 import { useMessages } from './useMessages'
+import { getStoredAccessToken } from '~/composables/authSessionManager'
 import type {
   WsConnectionState,
   WsOutgoingMessage,
@@ -50,7 +51,7 @@ export const useAgentWebSocket = (
   const getWebSocketUrl = (id: string): string | null => {
     if (typeof window === 'undefined') return null
 
-    const token = localStorage.getItem('auth_token')
+    const token = getStoredAccessToken()
     if (!token) {
       console.error('[WebSocket] No auth token found')
       return null

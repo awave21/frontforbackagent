@@ -1,9 +1,9 @@
 <template>
-  <div class="min-h-screen bg-slate-50">
+  <div class="h-screen flex flex-col bg-slate-50 overflow-hidden">
     <!-- Mobile Header (only show when dialog list is visible) -->
     <div
       v-if="showMobileList || !selectedDialogId"
-      class="lg:hidden bg-white border-b border-slate-200 px-4 py-3"
+      class="lg:hidden bg-white border-b border-slate-200 px-4 py-3 shrink-0"
     >
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
@@ -23,9 +23,9 @@
       </div>
     </div>
 
-    <div class="flex">
+    <div class="flex flex-1 min-h-0">
       <!-- Desktop Sidebar (Navigation) -->
-      <DashboardSidebar class="hidden lg:block" />
+      <DashboardSidebar class="hidden lg:flex" />
 
       <!-- Mobile Sidebar Overlay -->
       <div
@@ -49,7 +49,7 @@
       </transition>
 
       <!-- Main Content: Two Column Layout -->
-      <main class="flex-1 flex h-[calc(100vh-57px)] lg:h-screen overflow-hidden">
+      <main class="flex-1 min-w-0 flex overflow-hidden">
         <!-- Left Column: Dialogs List (hidden on mobile when chat is open) -->
         <div
           :class="[
@@ -251,7 +251,7 @@ onMounted(() => {
 })
 
 // Define page meta (Nuxt compiler macro)
-// @ts-expect-error definePageMeta is a Nuxt compiler macro
+
 definePageMeta({
   middleware: 'auth'
 })

@@ -1,13 +1,13 @@
 <template>
-  <div class="min-h-screen bg-slate-50">
+  <div class="h-screen flex flex-col bg-slate-50 overflow-hidden">
     <!-- Mobile Header -->
-    <div class="lg:hidden bg-white border-b border-slate-200 px-4 py-3">
+    <div class="lg:hidden bg-white border-b border-slate-200 px-4 py-3 shrink-0">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
           <div class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-            <span class="text-white font-bold text-xs">М</span>
+            <span class="text-white font-bold text-xs">{{ tenant?.name ? tenant.name.charAt(0).toUpperCase() : 'О' }}</span>
           </div>
-          <span class="text-slate-900 font-bold">МедиАИ</span>
+          <span class="text-slate-900 font-bold">{{ tenant?.name || 'Организация' }}</span>
         </div>
         <button
           @click="isSidebarOpen = !isSidebarOpen"
@@ -18,9 +18,9 @@
       </div>
     </div>
 
-    <div class="flex">
+    <div class="flex flex-1 min-h-0">
       <!-- Desktop Sidebar -->
-      <DashboardSidebar class="hidden lg:block" />
+      <DashboardSidebar class="hidden lg:flex" />
 
       <!-- Mobile Sidebar Overlay -->
       <transition
@@ -56,7 +56,7 @@
       </transition>
 
       <!-- Main Content -->
-      <main class="flex-1 bg-slate-50 p-4 sm:p-6 lg:p-10">
+      <main class="flex-1 min-w-0 bg-slate-50 overflow-y-auto p-4 sm:p-6 lg:p-10">
         <div class="max-w-7xl mx-auto">
           <!-- Auth Status Banner -->
           <div v-if="!isAuthenticated" class="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
@@ -90,7 +90,7 @@
                 Панель управления
               </h1>
               <p class="text-slate-600 mt-1 sm:mt-2 text-sm sm:text-base">
-                Добро пожаловать обратно, Др. Иванов
+                Добро пожаловать обратно{{ user?.full_name ? `, ${user.full_name}` : '' }}
               </p>
             </div>
             <div class="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 bg-white rounded-lg border border-slate-200 self-start sm:self-auto">
@@ -104,25 +104,28 @@
           <!-- Metrics Cards -->
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5 mb-6 lg:mb-8">
             <MetricCard
-              title="Всего запросов"
-              value="2,847"
-              change="+12% от прошлой недели"
-              changeType="positive"
-              icon="TrendingUp"
+              title="Всего агентов"
+              :value="String(agents.length)"
+              description="Все зарегистрированные агенты"
+              :trend="agents.filter(a => a.status === 'published').length + ' активных'"
+              type="info"
+              icon="BarChart2"
             />
             <MetricCard
               title="Активных агентов"
-              value="3"
-              change="Все агенты онлайн"
-              changeType="neutral"
-              icon="Bot"
+              :value="String(agents.filter(a => a.status === 'published').length)"
+              description="Опубликованные и работающие"
+              trend="Все системы в норме"
+              type="positive"
+              icon="Target"
             />
             <MetricCard
-              title="Время отклика"
-              value="0.8s"
-              change="Среднее время"
-              changeType="neutral"
-              icon="Zap"
+              title="Черновики"
+              :value="String(agents.filter(a => a.status === 'draft').length)"
+              description="Агенты в разработке"
+              trend="Ожидают публикации"
+              type="warning"
+              icon="FileText"
             />
           </div>
 
@@ -132,14 +135,37 @@
               <h2 class="text-lg sm:text-xl font-bold text-slate-900">
                 Подключенные агенты
               </h2>
-              <button class="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-600 hover:to-purple-700 transition-colors text-sm sm:text-base">
+              <NuxtLink
+                to="/agents/new"
+                class="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-600 hover:to-purple-700 transition-colors text-sm sm:text-base"
+              >
                 <PlusIcon class="h-4 w-4" />
                 <span class="hidden sm:inline">Добавить агента</span>
                 <span class="sm:hidden">Добавить</span>
-              </button>
+              </NuxtLink>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-5">
+            <!-- Loading State -->
+            <div v-if="agentsLoading" class="flex justify-center py-8">
+              <Loader2 class="h-8 w-8 text-indigo-600 animate-spin" />
+            </div>
+
+            <!-- Empty State -->
+            <div v-else-if="agents.length === 0" class="bg-white rounded-xl border border-slate-200 p-12 text-center">
+              <Bot class="h-12 w-12 text-slate-400 mx-auto mb-4" />
+              <h3 class="text-lg font-medium text-slate-900 mb-2">Нет агентов</h3>
+              <p class="text-slate-600 text-sm mb-4">Создайте своего первого AI-агента</p>
+              <NuxtLink
+                to="/agents/new"
+                class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm"
+              >
+                <PlusIcon class="h-4 w-4" />
+                Создать агента
+              </NuxtLink>
+            </div>
+
+            <!-- Agents Grid -->
+            <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-5">
               <AgentCard
                 v-for="agent in agents"
                 :key="agent.id"
@@ -182,10 +208,11 @@ definePageMeta({
   middleware: 'auth'
 })
 
-import { ref } from 'vue'
-import { CalendarIcon, ChevronDownIcon, PlusIcon, MenuIcon, AlertCircle } from 'lucide-vue-next'
+import { ref, onMounted, watch } from 'vue'
+import { CalendarIcon, ChevronDownIcon, PlusIcon, MenuIcon, AlertCircle, Bot, Loader2 } from 'lucide-vue-next'
 import { useDashboardData } from '../composables/useDashboardData'
 import { useAuth } from '../composables/useAuth'
+import { useAgents } from '../composables/useAgents'
 
 // Mobile sidebar state
 const isSidebarOpen = ref(false)
@@ -204,48 +231,22 @@ const handleAuthenticated = () => {
 // Composables
 const { data: dashboardData } = await useDashboardData()
 
-// Agents data
-const agents = [
-  {
-    id: 1,
-    name: 'Агент Записи',
-    icon: 'UserCheck',
-    color: 'from-sky-500 to-cyan-500',
-    borderColor: 'border-sky-100',
-    stats: [
-      { value: '1,284', label: 'Запросов' },
-      { value: '98%', label: 'Успешно' }
-    ],
-    status: 'Активен',
-    statusColor: 'text-green-600'
-  },
-  {
-    id: 2,
-    name: 'Агент Диагностики',
-    icon: 'Activity',
-    color: 'from-purple-500 to-pink-500',
-    borderColor: 'border-purple-100',
-    stats: [
-      { value: '892', label: 'Запросов' },
-      { value: '95%', label: 'Успешно' }
-    ],
-    status: 'Активен',
-    statusColor: 'text-green-600'
-  },
-  {
-    id: 3,
-    name: 'Агент Документации',
-    icon: 'FileCheck',
-    color: 'from-emerald-500 to-cyan-500',
-    borderColor: 'border-emerald-100',
-    stats: [
-      { value: '671', label: 'Запросов' },
-      { value: '100%', label: 'Успешно' }
-    ],
-    status: 'Активен',
-    statusColor: 'text-green-600'
+// Agents data (real)
+const { agents, fetchAgents, isLoading: agentsLoading } = useAgents()
+
+const loadAgents = () => {
+  if (isAuthenticated.value) {
+    fetchAgents()
   }
-]
+}
+
+onMounted(() => {
+  loadAgents()
+})
+
+watch(isAuthenticated, (val) => {
+  if (val) loadAgents()
+})
 
 // Recent activities data
 const recentActivities = [

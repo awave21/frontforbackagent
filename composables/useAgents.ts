@@ -1,6 +1,7 @@
 import { ref, readonly } from 'vue'
 import { useApiFetch } from './useApiFetch'
 import { useAuth } from './useAuth'
+import { getReadableErrorMessage } from '~/utils/api-errors'
 
 export type AgentStatus = 'draft' | 'published'
 
@@ -57,6 +58,7 @@ export type Agent = {
   name: string
   system_prompt: string
   model: string
+  timezone?: string
   llm_params?: {
     temperature?: number
     max_tokens?: number
@@ -66,12 +68,15 @@ export type Agent = {
   created_at: string
   updated_at: string
   sqns_warning?: string | null
+  total_cost_usd?: string
+  total_cost_rub?: string
 }
 
 export type CreateAgentData = {
   name: string
   system_prompt: string
   model: string
+  timezone?: string
   llm_params?: {
     temperature?: number
     max_tokens?: number
@@ -110,7 +115,7 @@ export const useAgents = () => {
       agents.value = response
       return response
     } catch (err: any) {
-      error.value = err.message || 'Ошибка загрузки агентов'
+      error.value = getReadableErrorMessage(err, 'Не удалось загрузить список агентов')
       throw err
     } finally {
       isLoading.value = false
@@ -136,7 +141,7 @@ export const useAgents = () => {
 
       return response
     } catch (err: any) {
-      error.value = err.message || 'Ошибка создания агента'
+      error.value = getReadableErrorMessage(err, 'Не удалось создать агента')
       throw err
     } finally {
       isLoading.value = false
@@ -153,7 +158,7 @@ export const useAgents = () => {
 
       return response
     } catch (err: any) {
-      error.value = err.message || 'Ошибка загрузки агента'
+      error.value = getReadableErrorMessage(err, 'Не удалось загрузить агента')
       throw err
     } finally {
       isLoading.value = false
@@ -182,7 +187,7 @@ export const useAgents = () => {
 
       return response
     } catch (err: any) {
-      error.value = err.message || 'Ошибка обновления агента'
+      error.value = getReadableErrorMessage(err, 'Не удалось обновить агента')
       throw err
     } finally {
       isLoading.value = false
@@ -203,7 +208,7 @@ export const useAgents = () => {
       agents.value = agents.value.filter(agent => agent.id !== agentId)
 
     } catch (err: any) {
-      error.value = err.message || 'Ошибка удаления агента'
+      error.value = getReadableErrorMessage(err, 'Не удалось удалить агента')
       throw err
     } finally {
       isLoading.value = false
@@ -220,7 +225,7 @@ export const useAgents = () => {
       sqnsStatus.value = response
       return response
     } catch (err: any) {
-      sqnsError.value = err.message || 'Ошибка загрузки SQNS-статуса'
+      sqnsError.value = getReadableErrorMessage(err, 'Не удалось загрузить статус SQNS')
       throw err
     } finally {
       isSqnsLoading.value = false
@@ -246,7 +251,7 @@ export const useAgents = () => {
       sqnsStatus.value = response
       return response
     } catch (err: any) {
-      sqnsError.value = err.message || 'Ошибка включения SQNS'
+      sqnsError.value = getReadableErrorMessage(err, 'Не удалось включить интеграцию SQNS')
       throw err
     } finally {
       isSqnsLoading.value = false
@@ -264,7 +269,7 @@ export const useAgents = () => {
 
       sqnsStatus.value = { sqnsEnabled: false }
     } catch (err: any) {
-      sqnsError.value = err.message || 'Ошибка отключения SQNS'
+      sqnsError.value = getReadableErrorMessage(err, 'Не удалось отключить интеграцию SQNS')
       throw err
     } finally {
       isSqnsLoading.value = false
@@ -278,7 +283,7 @@ export const useAgents = () => {
       sqnsResources.value = response.resources ?? []
       return sqnsResources.value
     } catch (err: any) {
-      sqnsError.value = err.message || 'Ошибка загрузки ресурсов SQNS'
+      sqnsError.value = getReadableErrorMessage(err, 'Не удалось загрузить ресурсы SQNS')
       throw err
     }
   }
@@ -290,7 +295,7 @@ export const useAgents = () => {
       sqnsServices.value = response.services ?? []
       return sqnsServices.value
     } catch (err: any) {
-      sqnsError.value = err.message || 'Ошибка загрузки услуг SQNS'
+      sqnsError.value = getReadableErrorMessage(err, 'Не удалось загрузить услуги SQNS')
       throw err
     }
   }
@@ -304,7 +309,7 @@ export const useAgents = () => {
       })
       return response
     } catch (err: any) {
-      sqnsError.value = err.message || 'Ошибка синхронизации SQNS'
+      sqnsError.value = getReadableErrorMessage(err, 'Не удалось синхронизировать SQNS')
       throw err
     } finally {
       isSqnsLoading.value = false
@@ -331,7 +336,7 @@ export const useAgents = () => {
       })
       return response
     } catch (err: any) {
-      sqnsError.value = err.message || 'Ошибка загрузки кэшированных услуг'
+      sqnsError.value = getReadableErrorMessage(err, 'Не удалось загрузить кэшированные услуги')
       throw err
     }
   }
@@ -361,7 +366,7 @@ export const useAgents = () => {
         statusCode: err.statusCode,
         statusMessage: err.statusMessage
       })
-      sqnsError.value = err.message || 'Ошибка обновления услуги'
+      sqnsError.value = getReadableErrorMessage(err, 'Не удалось обновить услугу')
       throw err
     }
   }
@@ -376,7 +381,7 @@ export const useAgents = () => {
         body: data
       })
     } catch (err: any) {
-      sqnsError.value = err.message || 'Ошибка массового обновления услуг'
+      sqnsError.value = getReadableErrorMessage(err, 'Не удалось выполнить массовое обновление услуг')
       throw err
     }
   }
@@ -386,7 +391,7 @@ export const useAgents = () => {
       const response = await apiFetch<{ categories: any[] }>(`/agents/${agentId}/sqns/categories`)
       return response.categories
     } catch (err: any) {
-      sqnsError.value = err.message || 'Ошибка загрузки категорий'
+      sqnsError.value = getReadableErrorMessage(err, 'Не удалось загрузить категории')
       throw err
     }
   }
@@ -396,7 +401,7 @@ export const useAgents = () => {
       const response = await apiFetch<{ specialists: SqnsSpecialist[] }>(`/agents/${agentId}/sqns/specialists`)
       return response.specialists
     } catch (err: any) {
-      sqnsError.value = err.message || 'Ошибка загрузки специалистов'
+      sqnsError.value = getReadableErrorMessage(err, 'Не удалось загрузить специалистов')
       throw err
     }
   }
@@ -426,7 +431,7 @@ export const useAgents = () => {
         statusCode: err.statusCode,
         statusMessage: err.statusMessage
       })
-      sqnsError.value = err.message || 'Ошибка обновления категории'
+      sqnsError.value = getReadableErrorMessage(err, 'Не удалось обновить категорию')
       throw err
     }
   }
@@ -435,7 +440,7 @@ export const useAgents = () => {
     try {
       return await apiFetch<any>(`/agents/${agentId}/sqns/disable-preview`)
     } catch (err: any) {
-      sqnsError.value = err.message || 'Ошибка загрузки превью удаления'
+      sqnsError.value = getReadableErrorMessage(err, 'Не удалось загрузить предпросмотр удаления')
       throw err
     }
   }

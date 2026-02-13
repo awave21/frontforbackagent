@@ -1,13 +1,13 @@
 <template>
-  <div class="min-h-screen bg-slate-50">
+  <div class="h-screen flex flex-col bg-slate-50 overflow-hidden">
     <!-- Mobile Header -->
-    <div class="lg:hidden bg-white border-b border-slate-200 px-4 py-3">
+    <div class="lg:hidden bg-white border-b border-slate-200 px-4 py-3 shrink-0">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
           <div class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-            <span class="text-white font-bold text-xs">М</span>
+            <span class="text-white font-bold text-xs">{{ tenant?.name ? tenant.name.charAt(0).toUpperCase() : 'О' }}</span>
           </div>
-          <span class="text-slate-900 font-bold">МедиАИ</span>
+          <span class="text-slate-900 font-bold">{{ tenant?.name || 'Организация' }}</span>
         </div>
         <button
           @click="isSidebarOpen = !isSidebarOpen"
@@ -18,9 +18,9 @@
       </div>
     </div>
 
-    <div class="flex">
+    <div class="flex flex-1 min-h-0">
       <!-- Desktop Sidebar -->
-      <DashboardSidebar class="hidden lg:block" />
+      <DashboardSidebar class="hidden lg:flex" />
 
       <!-- Mobile Sidebar Overlay -->
       <transition
@@ -56,7 +56,7 @@
       </transition>
 
       <!-- Main Content -->
-      <main class="flex-1 bg-slate-50 p-4 sm:p-6 lg:p-10">
+      <main class="flex-1 min-w-0 bg-slate-50 overflow-y-auto p-4 sm:p-6 lg:p-10">
         <div class="max-w-6xl mx-auto">
           <!-- Permission Check -->
           <div v-if="!canManageMembers" class="bg-white rounded-xl border border-slate-200 p-8 text-center">
@@ -357,13 +357,14 @@ definePageMeta({
   middleware: 'auth'
 })
 
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { MenuIcon, AlertCircle, Plus, Loader2, Users, Copy, Trash2, Clock, Mail } from 'lucide-vue-next'
 import { useAuth, type User } from '../../composables/useAuth'
 import { usePermissions } from '../../composables/usePermissions'
 import { useApiFetch } from '../../composables/useApiFetch'
 import { useToast } from '../../composables/useToast'
 import InviteUserModal from '../../components/settings/InviteUserModal.vue'
+import { getReadableErrorMessage } from '~/utils/api-errors'
 
 // Types
 type Invitation = {
@@ -392,7 +393,7 @@ const memberToDelete = ref<User | null>(null)
 const copiedInviteId = ref<string | null>(null)
 
 // Composables
-const { user: currentUser } = useAuth()
+const { user: currentUser, tenant } = useAuth()
 const { canManageMembers } = usePermissions()
 const apiFetch = useApiFetch()
 const toast = useToast()
@@ -454,8 +455,7 @@ const fetchMembers = async () => {
     })
     members.value = response || []
   } catch (err: any) {
-    const apiError = err?.apiError || err
-    const errorMessage = apiError?.message || 'Не удалось загрузить список участников'
+    const errorMessage = getReadableErrorMessage(err, 'Не удалось загрузить список участников')
     error.value = errorMessage
     toast.error('Ошибка', errorMessage)
   } finally {
@@ -511,8 +511,7 @@ const deleteInvitation = async (invitationId: string) => {
     invitations.value = invitations.value.filter(i => i.id !== invitationId)
     toast.success('Приглашение удалено', 'Приглашение успешно отменено')
   } catch (err: any) {
-    const apiError = err?.apiError || err
-    toast.error('Ошибка', apiError?.message || 'Не удалось удалить приглашение')
+    toast.error('Ошибка', getReadableErrorMessage(err, 'Не удалось удалить приглашение'))
   } finally {
     deletingInvitations.value.delete(invitationId)
   }
@@ -546,8 +545,7 @@ const updateRole = async (userId: string, newRole: string) => {
 
     toast.success('Роль обновлена', `Роль участника успешно изменена на "${newRole === 'admin' ? 'Администратор' : 'Менеджер'}"`)
   } catch (err: any) {
-    const apiError = err?.apiError || err
-    toast.error('Ошибка', apiError?.message || 'Не удалось обновить роль')
+    toast.error('Ошибка', getReadableErrorMessage(err, 'Не удалось обновить роль'))
   } finally {
     updatingRoles.value.delete(userId)
   }
@@ -573,8 +571,7 @@ const deleteMember = async (userId: string) => {
 
     toast.success('Участник удален', 'Участник успешно удален из организации')
   } catch (err: any) {
-    const apiError = err?.apiError || err
-    toast.error('Ошибка', apiError?.message || 'Не удалось удалить участника')
+    toast.error('Ошибка', getReadableErrorMessage(err, 'Не удалось удалить участника'))
   } finally {
     deletingUsers.value.delete(userId)
   }
@@ -598,10 +595,25 @@ const getRoleLabel = (role: string): string => {
   return labels[role] || role
 }
 
-onMounted(() => {
-  if (canManageMembers.value) {
+// Track whether we've already started loading team data
+const hasFetchedTeamData = ref(false)
+
+const loadTeamData = () => {
+  if (canManageMembers.value && !hasFetchedTeamData.value) {
+    hasFetchedTeamData.value = true
     fetchMembers()
     fetchInvitations()
+  }
+}
+
+onMounted(() => {
+  loadTeamData()
+})
+
+// Watch for when auth loads asynchronously and canManageMembers becomes true
+watch(canManageMembers, (newValue) => {
+  if (newValue) {
+    loadTeamData()
   }
 })
 </script>

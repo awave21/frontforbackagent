@@ -79,12 +79,32 @@
                     class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   >
                     <option value="">Выберите модель</option>
-                    <option value="openai:gpt-4o-mini">GPT-4o Mini</option>
-                    <option value="openai:gpt-4o">GPT-4o</option>
-                    <option value="openai:gpt-4">GPT-4</option>
-                    <option value="anthropic:claude-3-haiku">Claude 3 Haiku</option>
-                    <option value="anthropic:claude-3-sonnet">Claude 3 Sonnet</option>
+                    <option v-if="isLoadingModels && !modelGroups.length" value="" disabled>
+                      Загрузка моделей...
+                    </option>
+                    <option v-else-if="modelsError && !modelGroups.length" value="" disabled>
+                      Не удалось загрузить модели
+                    </option>
+                    <option v-else-if="!modelGroups.length" value="" disabled>
+                      Нет доступных моделей
+                    </option>
+                    <optgroup
+                      v-for="group in modelGroups"
+                      :key="group.group"
+                      :label="group.group"
+                    >
+                      <option
+                        v-for="option in group.options"
+                        :key="option.value"
+                        :value="option.value"
+                      >
+                        {{ option.label }}
+                      </option>
+                    </optgroup>
                   </select>
+                  <p v-if="modelsError" class="mt-2 text-xs text-rose-600">
+                    {{ modelsError }}
+                  </p>
                 </div>
 
                 <!-- Параметры LLM -->
@@ -150,6 +170,7 @@
 import { reactive, watch } from 'vue'
 import { X, Loader2 } from 'lucide-vue-next'
 import { useAgents } from '../composables/useAgents'
+import { useActiveModels } from '../composables/useActiveModels'
 
 interface Props {
   isOpen: boolean
@@ -161,7 +182,14 @@ const emit = defineEmits<{
   agentCreated: [agent: any]
 }>()
 
-const { createAgent, isLoading, error } = useAgents()
+const { createAgent, isLoading } = useAgents()
+const {
+  modelGroups,
+  isLoading: isLoadingModels,
+  error: modelsError,
+  fetchActiveModels,
+  getFirstModelValue
+} = useActiveModels()
 
 // Форма создания агента
 const form = reactive({
@@ -202,13 +230,19 @@ const handleSubmit = async () => {
 }
 
 // Сброс формы при закрытии
-watch(() => props.isOpen, (isOpen) => {
-  if (!isOpen) {
-    form.name = ''
-    form.system_prompt = ''
-    form.model = ''
-    form.llm_params.temperature = 0.7
-    form.llm_params.max_tokens = 1000
+watch(() => props.isOpen, async (isOpen) => {
+  if (isOpen) {
+    await fetchActiveModels()
+    if (!form.model) {
+      form.model = getFirstModelValue()
+    }
+    return
   }
+
+  form.name = ''
+  form.system_prompt = ''
+  form.model = ''
+  form.llm_params.temperature = 0.7
+  form.llm_params.max_tokens = 1000
 })
 </script>
