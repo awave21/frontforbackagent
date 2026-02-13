@@ -1,65 +1,7 @@
 <template>
-  <div class="h-screen flex flex-col bg-slate-50 overflow-hidden">
-    <!-- Mobile Header -->
-    <div class="lg:hidden bg-white border-b border-slate-200 px-4 py-3 shrink-0">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <div class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-            <span class="text-white font-bold text-xs">{{ tenant?.name ? tenant.name.charAt(0).toUpperCase() : 'О' }}</span>
-          </div>
-          <span class="text-slate-900 font-bold">{{ tenant?.name || 'Организация' }}</span>
-        </div>
-        <button
-          @click="isSidebarOpen = !isSidebarOpen"
-          class="p-2 rounded-lg text-slate-600 hover:bg-slate-100"
-        >
-          <MenuIcon class="h-5 w-5" />
-        </button>
-      </div>
-    </div>
-
-    <div class="flex flex-1 min-h-0">
-      <!-- Desktop Sidebar -->
-      <DashboardSidebar class="hidden lg:flex" />
-
-      <!-- Mobile Sidebar Overlay -->
-      <transition
-        enter-active-class="transition-all duration-400 ease-out"
-        enter-from-class="opacity-0 backdrop-blur-0"
-        enter-to-class="opacity-100 backdrop-blur-sm"
-        leave-active-class="transition-all duration-300 ease-in"
-        leave-from-class="opacity-100 backdrop-blur-sm"
-        leave-to-class="opacity-0 backdrop-blur-0"
-      >
-        <div
-          v-if="isSidebarOpen"
-          class="lg:hidden fixed inset-0 z-40 bg-black bg-opacity-50"
-          @click="isSidebarOpen = false"
-        ></div>
-      </transition>
-
-      <!-- Mobile Sidebar -->
-      <transition
-        enter-active-class="transition-all duration-500 cubic-bezier(0.34, 1.56, 0.64, 1)"
-        enter-from-class="-translate-x-full opacity-0 scale-95"
-        enter-to-class="translate-x-0 opacity-100 scale-100"
-        leave-active-class="transition-all duration-400 ease-in"
-        leave-from-class="translate-x-0 opacity-100 scale-100"
-        leave-to-class="-translate-x-full opacity-0 scale-95"
-      >
-        <div
-          v-if="isSidebarOpen"
-          class="lg:hidden fixed inset-0 z-50 w-full"
-        >
-          <DashboardSidebar @close="isSidebarOpen = false" />
-        </div>
-      </transition>
-
-      <!-- Main Content -->
-      <main class="flex-1 min-w-0 bg-slate-50 overflow-y-auto p-4 sm:p-6 lg:p-10">
-        <div class="max-w-7xl mx-auto">
-          <!-- Auth Status Banner -->
-          <div v-if="!isAuthenticated" class="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+  <div class="w-full px-5 py-5 flex flex-col gap-5">
+    <!-- Auth Status Banner -->
+    <div v-if="!isAuthenticated" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
             <div class="flex items-center justify-between">
               <div class="flex items-center">
                 <AlertCircle class="h-5 w-5 text-yellow-400 mr-3" />
@@ -83,26 +25,9 @@
             </div>
           </div>
 
-          <!-- Header Section -->
-          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 lg:mb-8">
-            <div class="mb-4 sm:mb-0">
-              <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
-                Панель управления
-              </h1>
-              <p class="text-slate-600 mt-1 sm:mt-2 text-sm sm:text-base">
-                Добро пожаловать обратно{{ user?.full_name ? `, ${user.full_name}` : '' }}
-              </p>
-            </div>
-            <div class="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 bg-white rounded-lg border border-slate-200 self-start sm:self-auto">
-              <CalendarIcon class="h-4 w-4 text-slate-600" />
-              <span class="text-xs sm:text-sm font-medium text-slate-900 hidden sm:inline">Последние 7 дней</span>
-              <span class="text-xs sm:text-sm font-medium text-slate-900 sm:hidden">7 дней</span>
-              <ChevronDownIcon class="h-4 w-4 text-slate-600" />
-            </div>
-          </div>
 
-          <!-- Metrics Cards -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5 mb-6 lg:mb-8">
+    <!-- Metrics Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5">
             <MetricCard
               title="Всего агентов"
               :value="String(agents.length)"
@@ -127,70 +52,67 @@
               type="warning"
               icon="FileText"
             />
-          </div>
+    </div>
 
-          <!-- Agents Section -->
-          <div class="mb-6 lg:mb-8">
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 lg:mb-6 gap-3 sm:gap-0">
-              <h2 class="text-lg sm:text-xl font-bold text-slate-900">
+    <!-- Agents Section -->
+    <div>
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 lg:mb-6 gap-3 sm:gap-0">
+        <h2 class="text-lg sm:text-xl font-bold text-foreground">
                 Подключенные агенты
-              </h2>
-              <NuxtLink
-                to="/agents/new"
-                class="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-600 hover:to-purple-700 transition-colors text-sm sm:text-base"
-              >
-                <PlusIcon class="h-4 w-4" />
-                <span class="hidden sm:inline">Добавить агента</span>
-                <span class="sm:hidden">Добавить</span>
-              </NuxtLink>
-            </div>
+        </h2>
+        <NuxtLink
+          to="/agents/new"
+          class="flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors text-sm sm:text-base"
+        >
+          <PlusIcon class="h-4 w-4" />
+          <span class="hidden sm:inline">Добавить агента</span>
+          <span class="sm:hidden">Добавить</span>
+        </NuxtLink>
+      </div>
 
-            <!-- Loading State -->
-            <div v-if="agentsLoading" class="flex justify-center py-8">
-              <Loader2 class="h-8 w-8 text-indigo-600 animate-spin" />
-            </div>
+      <!-- Loading State -->
+      <div v-if="agentsLoading" class="flex justify-center py-8">
+        <Loader2 class="h-8 w-8 text-primary animate-spin" />
+      </div>
 
-            <!-- Empty State -->
-            <div v-else-if="agents.length === 0" class="bg-white rounded-xl border border-slate-200 p-12 text-center">
-              <Bot class="h-12 w-12 text-slate-400 mx-auto mb-4" />
-              <h3 class="text-lg font-medium text-slate-900 mb-2">Нет агентов</h3>
-              <p class="text-slate-600 text-sm mb-4">Создайте своего первого AI-агента</p>
-              <NuxtLink
-                to="/agents/new"
-                class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm"
-              >
-                <PlusIcon class="h-4 w-4" />
-                Создать агента
-              </NuxtLink>
-            </div>
+      <!-- Empty State -->
+      <div v-else-if="agents.length === 0" class="bg-background rounded-xl border border-border p-12 text-center">
+        <Bot class="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+        <h3 class="text-lg font-medium text-foreground mb-2">Нет агентов</h3>
+        <p class="text-muted-foreground text-sm mb-4">Создайте своего первого AI-агента</p>
+        <NuxtLink
+          to="/agents/new"
+          class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm"
+        >
+          <PlusIcon class="h-4 w-4" />
+          Создать агента
+        </NuxtLink>
+      </div>
 
-            <!-- Agents Grid -->
-            <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-5">
-              <AgentCard
-                v-for="agent in agents"
-                :key="agent.id"
-                :agent="agent"
-              />
-            </div>
-          </div>
+      <!-- Agents Grid -->
+      <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-5">
+        <AgentCard
+          v-for="agent in agents"
+          :key="agent.id"
+          :agent="agent"
+        />
+      </div>
+    </div>
 
-          <!-- Recent Activity -->
-          <div>
-            <h2 class="text-lg sm:text-xl font-bold text-slate-900 mb-4 lg:mb-6">
-              Недавняя активность
-            </h2>
-            <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-              <div class="divide-y divide-slate-100">
-                <ActivityItem
-                  v-for="activity in recentActivities"
-                  :key="activity.id"
-                  :activity="activity"
-                />
-              </div>
-            </div>
-          </div>
+    <!-- Recent Activity -->
+    <div>
+      <h2 class="text-lg sm:text-xl font-bold text-foreground mb-4 lg:mb-6">
+        Недавняя активность
+      </h2>
+      <div class="bg-background rounded-xl border border-border overflow-hidden">
+        <div class="divide-y divide-border">
+          <ActivityItem
+            v-for="activity in recentActivities"
+            :key="activity.id"
+            :activity="activity"
+          />
         </div>
-      </main>
+      </div>
     </div>
 
     <!-- Auth Modal -->
@@ -209,16 +131,16 @@ definePageMeta({
 })
 
 import { ref, onMounted, watch } from 'vue'
-import { CalendarIcon, ChevronDownIcon, PlusIcon, MenuIcon, AlertCircle, Bot, Loader2 } from 'lucide-vue-next'
+import { CalendarIcon, ChevronDownIcon, PlusIcon, AlertCircle, Bot, Loader2 } from 'lucide-vue-next'
 import { useDashboardData } from '../composables/useDashboardData'
 import { useAuth } from '../composables/useAuth'
 import { useAgents } from '../composables/useAgents'
 
-// Mobile sidebar state
-const isSidebarOpen = ref(false)
+// Layout state
+const { pageTitle } = useLayoutState()
 
 // Auth state
-const { isAuthenticated, user, tenant } = useAuth()
+const { isAuthenticated, user } = useAuth()
 const showAuthModal = ref(false)
 
 // Auth handler
@@ -241,6 +163,7 @@ const loadAgents = () => {
 }
 
 onMounted(() => {
+  pageTitle.value = 'Панель управления'
   loadAgents()
 })
 

@@ -1,5 +1,5 @@
 <template>
-  <div class="h-full p-6 max-w-7xl mx-auto">
+  <div class="h-full px-5 py-5">
     <div class="h-full flex flex-col">
       <!-- Auth Status Banner -->
     <div v-if="!isAuthenticated" class="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
@@ -29,43 +29,7 @@
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
     </div>
 
-    <div v-else-if="agent" class="flex flex-col flex-1 min-h-0 gap-4">
-      <div class="flex items-center justify-between shrink-0">
-        <div class="flex items-center gap-3">
-          <!-- Page title (breadcrumb, lowercase) -->
-          <h1 class="text-sm text-slate-400 font-normal">
-            {{ title }}
-          </h1>
-          <span class="text-slate-300">/</span>
-          <!-- Agent name (same level, slightly emphasized) -->
-          <span class="text-sm text-slate-500 font-normal">
-            {{ agent.name }}
-          </span>
-        </div>
-        <div v-if="!$props.hideActions">
-          <div v-if="canEditAgents" class="flex items-center gap-3">
-            <button
-              @click="handleCancel"
-              class="px-6 py-2.5 text-slate-600 font-medium hover:text-slate-900 transition-colors"
-            >
-              Отменить
-            </button>
-            <button
-              @click="handleSave"
-              :disabled="isSaving"
-              class="px-8 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-            >
-              <Loader2 v-if="isSaving" class="h-4 w-4 animate-spin" />
-              <Check v-else class="h-4 w-4" />
-              Сохранить
-            </button>
-          </div>
-          <div v-else class="text-sm text-slate-500">
-            Режим просмотра
-          </div>
-        </div>
-      </div>
-
+    <div v-else class="flex flex-col flex-1 min-h-0 gap-4">
       <slot />
     </div>
 
@@ -79,7 +43,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { navigateTo } from '#app'
 import { storeToRefs } from 'pinia'
@@ -94,7 +58,7 @@ type Props = {
   hideActions?: boolean
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
 
 const showAuthModal = ref(false)
 const route = useRoute()
@@ -102,6 +66,19 @@ const store = useAgentEditorStore()
 const { agent, isLoading, isSaving } = storeToRefs(store)
 const { isAuthenticated } = useAuth()
 const { canEditAgents } = usePermissions()
+
+// Sync breadcrumb data to layout via shared state
+const { breadcrumbTitle, breadcrumbAgentName } = useLayoutState()
+breadcrumbTitle.value = props.title
+
+watch(() => agent.value?.name, (name) => {
+  breadcrumbAgentName.value = name || ''
+}, { immediate: true })
+
+onUnmounted(() => {
+  breadcrumbTitle.value = ''
+  breadcrumbAgentName.value = ''
+})
 
 const resolveAgentId = (value: string | string[] | undefined) =>
   Array.isArray(value) ? value[0] : value

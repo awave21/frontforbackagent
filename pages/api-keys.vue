@@ -1,56 +1,7 @@
 <template>
-  <div class="h-screen flex flex-col bg-slate-50 overflow-hidden">
-    <!-- Mobile Header -->
-    <div class="lg:hidden bg-white border-b border-slate-200 px-4 py-3 shrink-0">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <div class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-            <span class="text-white font-bold text-xs">{{ tenant?.name ? tenant.name.charAt(0).toUpperCase() : 'О' }}</span>
-          </div>
-          <span class="text-slate-900 font-bold">{{ tenant?.name || 'Организация' }}</span>
-        </div>
-        <button
-          @click="isSidebarOpen = !isSidebarOpen"
-          class="p-2 rounded-lg text-slate-600 hover:bg-slate-100"
-        >
-          <MenuIcon class="h-5 w-5" />
-        </button>
-      </div>
-    </div>
-
-    <div class="flex flex-1 min-h-0">
-      <!-- Desktop Sidebar -->
-      <DashboardSidebar class="hidden lg:flex" />
-
-      <!-- Mobile Sidebar Overlay -->
-      <div
-        v-if="isSidebarOpen"
-        class="lg:hidden fixed inset-0 z-40 bg-black bg-opacity-50"
-        @click="isSidebarOpen = false"
-      ></div>
-
-      <!-- Mobile Sidebar -->
-      <transition
-        enter-active-class="transition-all duration-500 cubic-bezier(0.34, 1.56, 0.64, 1)"
-        enter-from-class="-translate-x-full opacity-0 scale-95"
-        enter-to-class="translate-x-0 opacity-100 scale-100"
-        leave-active-class="transition-all duration-400 ease-in"
-        leave-from-class="translate-x-0 opacity-100 scale-100"
-        leave-to-class="-translate-x-full opacity-0 scale-95"
-      >
-        <div
-          v-if="isSidebarOpen"
-          class="lg:hidden fixed inset-0 z-50 w-full"
-        >
-          <DashboardSidebar @close="isSidebarOpen = false" />
-        </div>
-      </transition>
-
-      <!-- Main Content -->
-      <main class="flex-1 min-w-0 bg-slate-50 overflow-y-auto p-4 sm:p-6 lg:p-10">
-        <div class="max-w-4xl mx-auto">
-          <!-- Auth Status Banner -->
-          <div v-if="!isAuthenticated" class="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+  <div class="w-full px-5 py-5 flex flex-col gap-5">
+    <!-- Auth Status Banner -->
+    <div v-if="!isAuthenticated" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
             <div class="flex items-center justify-between">
               <div class="flex items-center">
                 <AlertCircle class="h-5 w-5 text-yellow-400 mr-3" />
@@ -72,30 +23,11 @@
             </div>
           </div>
 
-          <!-- Header Section -->
-          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 lg:mb-8">
-            <div class="mb-4 sm:mb-0">
-              <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
-                API Ключи
-              </h1>
-              <p class="text-slate-600 mt-1 sm:mt-2 text-sm sm:text-base">
-                Управление вашими API-ключами для доступа к системе
-              </p>
-            </div>
-            <button
-              v-if="isAuthenticated && !showCreateForm"
-              @click="showCreateForm = true"
-              class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
-            >
-              <PlusIcon class="h-4 w-4" />
-              Создать ключ
-            </button>
-          </div>
 
-          <!-- Create API Key Form -->
-          <div v-if="showCreateForm" class="bg-white rounded-xl border border-slate-200 p-6 mb-8">
-            <div class="flex items-center justify-between mb-6">
-              <h2 class="text-xl font-bold text-slate-900">Создать новый API ключ</h2>
+    <!-- Create API Key Form -->
+    <div v-if="showCreateForm" class="bg-background rounded-xl border border-border p-6">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-xl font-bold text-foreground">Создать новый API ключ</h2>
               <button
                 @click="showCreateForm = false"
                 class="p-2 text-slate-400 hover:text-slate-600 transition-colors"
@@ -253,13 +185,10 @@
                   >
                     Отозвать
                   </button>
-                </div>
-              </div>
             </div>
           </div>
         </div>
-      </main>
-    </div>
+      </div>
 
     <!-- Auth Modal -->
     <AuthModal
@@ -278,7 +207,6 @@ definePageMeta({
 
 import { ref, onMounted, watch } from 'vue'
 import {
-  MenuIcon,
   AlertCircle,
   PlusIcon,
   X,
@@ -288,14 +216,16 @@ import {
 import { useAuth } from '../composables/useAuth'
 import { useApiKeys } from '../composables/useApiKeys'
 
+// Layout state
+const { pageTitle } = useLayoutState()
+
 // State
-const isSidebarOpen = ref(false)
 const showAuthModal = ref(false)
 const showCreateForm = ref(false)
 const creatingApiKey = ref(false)
 
 // Composables
-const { isAuthenticated, tenant } = useAuth()
+const { isAuthenticated } = useAuth()
 const {
   apiKeys,
   fetchApiKeys,
@@ -324,6 +254,8 @@ const availableScopes = [
 
 // Load API keys on mount
 onMounted(async () => {
+  pageTitle.value = 'API Ключи'
+  
   if (isAuthenticated.value) {
     try {
       await fetchApiKeys()

@@ -1,96 +1,45 @@
 <template>
-  <div class="h-screen flex flex-col bg-slate-50 overflow-hidden">
-    <!-- Mobile Header (only show when dialog list is visible) -->
+  <!-- Two Column Layout: fills parent completely -->
+  <div class="fixed inset-0 top-[60px] lg:left-16 xl:left-64 flex overflow-hidden bg-muted transition-all duration-300">
+    <!-- Left Column: Dialogs List (hidden on mobile when chat is open) -->
     <div
-      v-if="showMobileList || !selectedDialogId"
-      class="lg:hidden bg-white border-b border-slate-200 px-4 py-3 shrink-0"
+      :class="[
+        'w-full lg:w-80 xl:w-96 flex-shrink-0 border-r border-border bg-background',
+        !showMobileList && selectedDialogId ? 'hidden lg:flex lg:flex-col' : 'flex flex-col'
+      ]"
     >
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <div
-            class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center"
-          >
-            <span class="text-white font-bold text-xs">М</span>
-          </div>
-          <span class="text-slate-900 font-bold">Диалоги</span>
-        </div>
-        <button
-          @click="isSidebarOpen = !isSidebarOpen"
-          class="p-2 rounded-lg text-slate-600 hover:bg-slate-100"
-        >
-          <MenuIcon class="h-5 w-5" />
-        </button>
-      </div>
+      <DialogsSidebar
+        :agents="agents"
+        :selected-agent-id="selectedAgentId"
+        :selected-dialog-id="selectedDialogId"
+        :is-loading="isLoadingAgents"
+        @select-agent="handleSelectAgent"
+        @select-dialog="handleSelectDialog"
+        @create-dialog="handleCreateDialog"
+      />
     </div>
 
-    <div class="flex flex-1 min-h-0">
-      <!-- Desktop Sidebar (Navigation) -->
-      <DashboardSidebar class="hidden lg:flex" />
-
-      <!-- Mobile Sidebar Overlay -->
-      <div
-        v-if="isSidebarOpen"
-        class="lg:hidden fixed inset-0 z-40 bg-black bg-opacity-50"
-        @click="isSidebarOpen = false"
+    <!-- Right Column: Chat Area -->
+    <div
+      :class="[
+        'flex-1 flex flex-col bg-muted',
+        showMobileList && selectedDialogId ? 'hidden lg:flex' : 'flex'
+      ]"
+    >
+      <ChatArea
+        v-if="selectedDialogId && selectedAgent"
+        :key="selectedDialogId"
+        :dialog-id="selectedDialogId"
+        :agent="selectedAgent"
+        :ws-send-message="wsSendMessage"
+        :is-ws-connected="isConnected"
+        @back="showMobileList = true"
       />
-
-      <!-- Mobile Sidebar -->
-      <transition
-        enter-active-class="transition-all duration-500 cubic-bezier(0.34, 1.56, 0.64, 1)"
-        enter-from-class="-translate-x-full opacity-0 scale-95"
-        enter-to-class="translate-x-0 opacity-100 scale-100"
-        leave-active-class="transition-all duration-400 ease-in"
-        leave-from-class="translate-x-0 opacity-100 scale-100"
-        leave-to-class="-translate-x-full opacity-0 scale-95"
-      >
-        <div v-if="isSidebarOpen" class="lg:hidden fixed inset-0 z-50 w-full">
-          <DashboardSidebar @close="isSidebarOpen = false" />
-        </div>
-      </transition>
-
-      <!-- Main Content: Two Column Layout -->
-      <main class="flex-1 min-w-0 flex overflow-hidden">
-        <!-- Left Column: Dialogs List (hidden on mobile when chat is open) -->
-        <div
-          :class="[
-            'w-full lg:w-80 xl:w-96 flex-shrink-0 border-r border-slate-200 bg-white',
-            !showMobileList && selectedDialogId ? 'hidden lg:flex lg:flex-col' : 'flex flex-col'
-          ]"
-        >
-          <DialogsSidebar
-            :agents="agents"
-            :selected-agent-id="selectedAgentId"
-            :selected-dialog-id="selectedDialogId"
-            :is-loading="isLoadingAgents"
-            @select-agent="handleSelectAgent"
-            @select-dialog="handleSelectDialog"
-            @create-dialog="handleCreateDialog"
-          />
-        </div>
-
-        <!-- Right Column: Chat Area -->
-        <div
-          :class="[
-            'flex-1 flex flex-col bg-slate-50',
-            showMobileList && selectedDialogId ? 'hidden lg:flex' : 'flex'
-          ]"
-        >
-          <ChatArea
-            v-if="selectedDialogId && selectedAgent"
-            :key="selectedDialogId"
-            :dialog-id="selectedDialogId"
-            :agent="selectedAgent"
-            :ws-send-message="wsSendMessage"
-            :is-ws-connected="isConnected"
-            @back="showMobileList = true"
-          />
-          <DialogsEmptyState
-            v-else
-            type="no-dialog"
-            @create="handleCreateDialog"
-          />
-        </div>
-      </main>
+      <DialogsEmptyState
+        v-else
+        type="no-dialog"
+        @create="handleCreateDialog"
+      />
     </div>
 
     <!-- Auth Modal -->
@@ -105,7 +54,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Menu as MenuIcon } from 'lucide-vue-next'
 import { useAgents } from '../composables/useAgents'
 import { useDialogs } from '../composables/useDialogs'
 import { useAuth } from '../composables/useAuth'
@@ -116,16 +64,14 @@ import type { Agent } from '../composables/useAgents'
 import DialogsSidebar from '../components/dialogs/DialogsSidebar.vue'
 import ChatArea from '../components/dialogs/ChatArea.vue'
 import DialogsEmptyState from '../components/dialogs/DialogsEmptyState.vue'
-import DashboardSidebar from '../components/DashboardSidebar.vue'
 import AuthModal from '../components/AuthModal.vue'
+
+// Layout state
+const { pageTitle } = useLayoutState()
 
 // Auth
 const { isAuthenticated } = useAuth()
 const showAuthModal = ref(false)
-
-// Sidebar state
-const isSidebarOpen = ref(false)
-
 
 // Route
 const route = useRoute()
@@ -243,6 +189,8 @@ watch(isAuthenticated, (authenticated) => {
 
 // Initialize
 onMounted(() => {
+  pageTitle.value = 'Диалоги'
+  
   if (isAuthenticated.value) {
     loadInitialData()
   } else {

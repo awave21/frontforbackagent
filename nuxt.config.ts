@@ -1,6 +1,6 @@
 // @ts-ignore
 export default defineNuxtConfig({
-  devtools: { enabled: true },
+  devtools: { enabled: false },
   typescript: { strict: true },
 
   css: ["~/assets/css/main.css"],

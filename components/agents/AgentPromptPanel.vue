@@ -37,21 +37,21 @@
           </button>
           <button
             type="button"
-            @click="isRightSidebarCollapsed = !isRightSidebarCollapsed"
-            class="inline-flex items-center justify-center p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
-            :title="isRightSidebarCollapsed ? 'Показать панель' : 'Скрыть панель'"
-          >
-            <PanelRightOpen v-if="isRightSidebarCollapsed" class="h-3.5 w-3.5" />
-            <PanelRightClose v-else class="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
             @click="isPromptFullscreen = !isPromptFullscreen"
             class="inline-flex items-center justify-center p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
             :title="isPromptFullscreen ? 'Свернуть' : 'Развернуть'"
           >
             <Minimize2 v-if="isPromptFullscreen" class="h-3.5 w-3.5" />
             <Maximize2 v-else class="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            @click="isRightSidebarCollapsed = !isRightSidebarCollapsed"
+            class="inline-flex items-center justify-center p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
+            :title="isRightSidebarCollapsed ? 'Показать панель' : 'Скрыть панель'"
+          >
+            <PanelRightOpen v-if="isRightSidebarCollapsed" class="h-3.5 w-3.5" />
+            <PanelRightClose v-else class="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
