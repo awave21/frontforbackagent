@@ -6,9 +6,18 @@
       <div class="p-4 border-b border-slate-200">
         <div class="flex justify-between items-center mb-3">
           <span class="font-semibold text-sm text-slate-900">Функции</span>
-          <button @click="createFunction" class="text-indigo-600 hover:bg-indigo-50 p-1 rounded transition-colors">
-            <Plus class="w-4 h-4" />
-          </button>
+          <div class="flex items-center gap-0.5">
+            <button 
+              @click="showCurlImport = true" 
+              class="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 p-1 rounded transition-colors"
+              title="Импорт из cURL"
+            >
+              <Terminal class="w-4 h-4" />
+            </button>
+            <button @click="createFunction" class="text-indigo-600 hover:bg-indigo-50 p-1 rounded transition-colors">
+              <Plus class="w-4 h-4" />
+            </button>
+          </div>
         </div>
         <div class="relative">
           <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
@@ -56,17 +65,19 @@
             v-model="displayName"
             @input="onDisplayNameInput"
             type="text"
-            placeholder="Название функции (напр: Создать пациента)"
+            placeholder="Название функции (напр: Создать пациента, Get patients)"
             class="text-xl font-semibold text-slate-900 m-0 border-none outline-none bg-transparent w-full placeholder:text-slate-300"
           />
           <div class="flex items-center gap-2 mt-0.5">
-            <span class="text-[11px] font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 font-normal flex items-center gap-1">
+            <span class="text-[11px] font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 font-normal">
               {{ selectedFunction.name || 'function_name' }}
-              <span v-if="isTranslating" class="inline-block w-2.5 h-2.5 border border-indigo-400 border-t-transparent rounded-full animate-spin"></span>
             </span>
             <span class="text-[11px] font-mono text-slate-300">
               ID: {{ selectedFunction.id }}
             </span>
+          </div>
+          <div v-if="!selectedFunction.name && !displayName" class="text-[11px] text-slate-400 mt-1">
+            Напр: get_patient_list, create_appointment, send_notification
           </div>
           <input
             v-model="selectedFunction.description"
@@ -455,6 +466,22 @@
         <Code class="h-8 w-8 text-slate-400" />
       </div>
       <p>Выберите функцию для редактирования</p>
+      <div class="flex items-center gap-3 mt-2">
+        <button 
+          @click="createFunction"
+          class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors"
+        >
+          <Plus class="w-4 h-4" />
+          Создать вручную
+        </button>
+        <button 
+          @click="showCurlImport = true"
+          class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
+        >
+          <Terminal class="w-4 h-4" />
+          Импорт из cURL
+        </button>
+      </div>
     </div>
 
     <!-- Right Sidebar: Tools -->
@@ -468,13 +495,22 @@
              @update:model-value="toggleFunctionStatus" 
            />
          </div>
-         <button 
-           @click="deleteFunction" 
-           class="p-2 text-red-500 hover:bg-red-50 rounded-md transition-colors"
-           title="Удалить функцию"
-         >
-           <Trash2 class="w-4 h-4" />
-         </button>
+         <div class="flex items-center gap-1">
+           <button 
+             @click="duplicateFunction" 
+             class="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+             title="Дублировать функцию"
+           >
+             <Copy class="w-4 h-4" />
+           </button>
+           <button 
+             @click="deleteFunction" 
+             class="p-2 text-red-500 hover:bg-red-50 rounded-md transition-colors"
+             title="Удалить функцию"
+           >
+             <Trash2 class="w-4 h-4" />
+           </button>
+         </div>
        </div>
 
        <!-- Test Console -->
@@ -555,18 +591,89 @@
       {{ statusMessage.text }}
     </div>
   </Transition>
+
+  <!-- cURL Import Dialog -->
+  <Dialog :open="showCurlImport" @update:open="(v: boolean) => { showCurlImport = v; if (!v) { curlInput = ''; curlError = '' } }">
+    <DialogContent class="max-w-2xl">
+      <DialogHeader>
+        <DialogTitle class="flex items-center gap-2 text-slate-900">
+          <Terminal class="w-5 h-5 text-indigo-600" />
+          Импорт из cURL
+        </DialogTitle>
+        <DialogDescription class="text-slate-500">
+          Вставьте cURL команду, и мы автоматически заполним URL, метод, заголовки и тело запроса.
+        </DialogDescription>
+      </DialogHeader>
+
+      <div class="space-y-4 py-2">
+        <div>
+          <textarea
+            v-model="curlInput"
+            class="w-full h-[200px] px-4 py-3 border border-slate-200 rounded-lg font-mono text-[13px] text-slate-900 bg-slate-50 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none placeholder:text-slate-400"
+            placeholder="curl -X POST https://api.example.com/endpoint \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer token' \
+  -d '{&quot;key&quot;: &quot;value&quot;}'"
+            @keydown.meta.enter="importFromCurl"
+            @keydown.ctrl.enter="importFromCurl"
+          ></textarea>
+        </div>
+
+        <Transition
+          enter-active-class="transition duration-150 ease-out"
+          enter-from-class="opacity-0 -translate-y-1"
+          enter-to-class="opacity-100 translate-y-0"
+          leave-active-class="transition duration-100 ease-in"
+          leave-from-class="opacity-100"
+          leave-to-class="opacity-0"
+        >
+          <div v-if="curlError" class="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            <X class="w-4 h-4 shrink-0" />
+            {{ curlError }}
+          </div>
+        </Transition>
+
+        <div class="flex items-center gap-3 text-xs text-slate-400">
+          <div class="flex items-center gap-1.5">
+            <kbd class="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-[10px] font-mono text-slate-500">Ctrl</kbd>
+            <span>+</span>
+            <kbd class="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-[10px] font-mono text-slate-500">Enter</kbd>
+            <span class="ml-1">для импорта</span>
+          </div>
+        </div>
+      </div>
+
+      <DialogFooter class="gap-2">
+        <DialogClose as-child>
+          <button class="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+            Отмена
+          </button>
+        </DialogClose>
+        <button 
+          @click="importFromCurl"
+          :disabled="!curlInput.trim()"
+          class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+        >
+          <Terminal class="w-4 h-4" />
+          Импортировать
+        </button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { 
-  Plus, Search, Trash2, Server, BrainCircuit, Code, RefreshCw, Play, X, Check 
+  Plus, Search, Trash2, Server, BrainCircuit, Code, RefreshCw, Play, X, Check, Copy, Terminal 
 } from 'lucide-vue-next'
 import Switch from '~/components/ui/switch/Switch.vue'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '~/components/ui/dialog'
 import { useApiFetch } from '~/composables/useApiFetch'
 import type { Tool, ToolTestResponse, ResponseTransform } from '~/types/tool'
 import FieldNode, { type FieldNodeData } from './FieldNode.vue'
 import { getReadableErrorMessage } from '~/utils/api-errors'
+import { parseCurl } from '~/utils/parse-curl'
 
 // Transliteration map: Cyrillic → Latin (fallback when translation unavailable)
 const cyrToLat: Record<string, string> = {
@@ -587,38 +694,6 @@ const toSnakeSlug = (input: string): string =>
     .replace(/^_+|_+$/g, '')
     .replace(/_+/g, '_')
 
-// Check if text contains non-Latin characters (Cyrillic etc.)
-const hasNonLatin = (text: string): boolean => /[^\x00-\x7F]/.test(text)
-
-// Translate text to English via free MyMemory API, then slugify
-let translateAbort: AbortController | null = null
-let translateTimeout: ReturnType<typeof setTimeout> | null = null
-
-const translateToEnglishSlug = async (text: string): Promise<string | null> => {
-  if (!text.trim() || !hasNonLatin(text)) return null
-
-  // Abort previous in-flight request
-  if (translateAbort) translateAbort.abort()
-  translateAbort = new AbortController()
-
-  try {
-    const res = await $fetch<any>(
-      `https://api.mymemory.translated.net/get`, {
-        params: { q: text, langpair: 'ru|en' },
-        signal: translateAbort.signal
-      }
-    )
-    const translated = res?.responseData?.translatedText
-    if (translated && translated.toLowerCase() !== text.toLowerCase()) {
-      return toSnakeSlug(translated)
-    }
-  } catch (e: any) {
-    if (e?.name !== 'AbortError') {
-      console.warn('Translation API failed, using transliteration', e)
-    }
-  }
-  return null
-}
 
 // Props
 const props = defineProps<{
@@ -628,7 +703,6 @@ const props = defineProps<{
 // State
 const functions = ref<Tool[]>([])
 const displayName = ref('')
-const isTranslating = ref(false)
 
 const selectedFunction = ref<Tool | null>(null)
 const activeTab = ref('Body')
@@ -640,6 +714,11 @@ const fieldTree = ref<FieldNodeData[]>([])
 const apiFetch = useApiFetch()
 const unsavedChanges = ref<Set<string>>(new Set())
 const statusMessage = ref<{ type: 'success' | 'error'; text: string } | null>(null)
+
+// cURL import
+const showCurlImport = ref(false)
+const curlInput = ref('')
+const curlError = ref('')
 
 const showStatus = (type: 'success' | 'error', text: string) => {
   statusMessage.value = { type, text }
@@ -774,11 +853,10 @@ const markAsChanged = () => {
   }
 }
 
-// Auto-generate snake_case slug from display name (instant transliteration + debounced translation)
+// Auto-generate snake_case slug from display name (transliteration only, no external API)
 const onDisplayNameInput = () => {
   if (!selectedFunction.value) return
 
-  // Instant: transliterate as immediate feedback
   selectedFunction.value.name = toSnakeSlug(displayName.value)
 
   // Persist original display name inside input_schema for reload
@@ -786,23 +864,6 @@ const onDisplayNameInput = () => {
     selectedFunction.value.input_schema._displayName = displayName.value
   }
   markAsChanged()
-
-  // Debounced: translate to English if input contains non-Latin chars
-  if (translateTimeout) clearTimeout(translateTimeout)
-  if (hasNonLatin(displayName.value)) {
-    isTranslating.value = true
-    const capturedName = displayName.value
-    translateTimeout = setTimeout(async () => {
-      const englishSlug = await translateToEnglishSlug(capturedName)
-      // Only apply if input hasn't changed while we were translating
-      if (englishSlug && selectedFunction.value && displayName.value === capturedName) {
-        selectedFunction.value.name = englishSlug
-      }
-      isTranslating.value = false
-    }, 600)
-  } else {
-    isTranslating.value = false
-  }
 }
 
 // Auto-save for parameters/headers — triggered on blur and destructive actions
@@ -1462,6 +1523,189 @@ const createFunction = () => {
   // Reset body parameters
   bodyParameters.value = []
   bodyJson.value = '{}'
+}
+
+// Import from cURL — parse cURL and populate a new function
+const importFromCurl = () => {
+  curlError.value = ''
+
+  const raw = curlInput.value.trim()
+  if (!raw) {
+    curlError.value = 'Вставьте cURL команду'
+    return
+  }
+
+  try {
+    const parsed = parseCurl(raw)
+
+    if (!parsed.url) {
+      curlError.value = 'Не удалось извлечь URL из команды'
+      return
+    }
+
+    // Create a new function shell
+    createFunction()
+    if (!selectedFunction.value) return
+
+    // Populate endpoint & method
+    selectedFunction.value.endpoint = parsed.url
+    selectedFunction.value.http_method = parsed.method
+
+    // Populate auth type
+    selectedFunction.value.auth_type = parsed.authType
+    if (parsed.authType !== 'none' && parsed.authValue) {
+      selectedFunction.value.credential_id = parsed.authValue
+    }
+
+    // Populate headers (exclude Content-Type and Authorization which are handled separately)
+    const skipHeaders = new Set(['content-type', 'authorization'])
+    const importedHeaders: Header[] = Object.entries(parsed.headers)
+      .filter(([key]) => !skipHeaders.has(key.toLowerCase()))
+      .map(([key, value]) => ({ key, value }))
+
+    // Keep Authorization in headers list if present (user may want to see/edit it)
+    const authEntry = Object.entries(parsed.headers).find(([k]) => k.toLowerCase() === 'authorization')
+    if (authEntry) {
+      importedHeaders.unshift({ key: authEntry[0], value: authEntry[1] })
+    }
+
+    headers.value = importedHeaders
+
+    // Populate body parameters from JSON body
+    if (parsed.bodyJson && typeof parsed.bodyJson === 'object' && !Array.isArray(parsed.bodyJson)) {
+      bodyParameters.value = Object.entries(parsed.bodyJson).map(([key, value]) => {
+        let type: BodyParameter['type'] = 'string'
+        let strValue = String(value)
+
+        if (typeof value === 'number') {
+          type = Number.isInteger(value) ? 'integer' : 'number'
+        } else if (typeof value === 'boolean') {
+          type = 'boolean'
+        } else if (Array.isArray(value)) {
+          type = 'array'
+          strValue = JSON.stringify(value)
+        } else if (typeof value === 'object' && value !== null) {
+          type = 'object'
+          strValue = JSON.stringify(value)
+        }
+
+        return {
+          key,
+          location: 'body' as const,
+          type,
+          value: strValue,
+          fromAI: false,
+          aiDescription: '',
+          aiDefaultValue: ''
+        }
+      })
+
+      generateInputSchema()
+      generateTestPayload()
+      syncFieldsToJson()
+    } else if (parsed.body) {
+      // Non-JSON body — put raw data into JSON view
+      bodyJson.value = parsed.body
+      bodyViewMode.value = 'json'
+    }
+
+    // Try to derive a display name from the URL path
+    try {
+      const urlObj = new URL(parsed.url)
+      const pathParts = urlObj.pathname.split('/').filter(Boolean)
+      if (pathParts.length > 0) {
+        const lastPart = pathParts[pathParts.length - 1]
+          .replace(/[^a-zA-Z0-9]/g, '_')
+          .replace(/_+/g, '_')
+          .toLowerCase()
+        const methodPrefix = parsed.method.toLowerCase()
+        const suggestedName = `${methodPrefix}_${lastPart}`
+        displayName.value = suggestedName
+        selectedFunction.value.name = suggestedName
+        if (selectedFunction.value.input_schema) {
+          selectedFunction.value.input_schema._displayName = suggestedName
+        }
+      }
+    } catch {
+      // Invalid URL, skip name derivation
+    }
+
+    markAsChanged()
+
+    // Close dialog and reset
+    showCurlImport.value = false
+    curlInput.value = ''
+    showStatus('success', 'Функция импортирована из cURL')
+  } catch (e: any) {
+    curlError.value = `Ошибка парсинга: ${e.message || 'неверный формат'}`
+  }
+}
+
+// Duplicate Function — deep-copy all settings, headers, params; give new name
+const duplicateFunction = () => {
+  if (!selectedFunction.value) return
+
+  const src = selectedFunction.value
+  const copyLabel = (src.input_schema?._displayName || src.name || '') + ' (копия)'
+  const copySlug = toSnakeSlug(copyLabel)
+
+  // Deep-copy headers from current editor state (already parsed into array)
+  const headersCopy: Header[] = headers.value.map(h => ({ key: h.key, value: h.value }))
+
+  // Deep-copy body parameters from current editor state
+  const bodyParamsCopy: BodyParameter[] = bodyParameters.value.map(p => ({ ...p }))
+
+  // Deep-copy custom_headers as object for the tool model
+  const customHeadersObj: Record<string, string> = {}
+  headersCopy.forEach(h => { if (h.key.trim()) customHeadersObj[h.key] = h.value })
+
+  const cloned: Tool = {
+    id: `new_${Date.now()}`,
+    name: copySlug,
+    description: src.description || '',
+    endpoint: src.endpoint || '',
+    http_method: src.http_method || 'POST',
+    execution_type: src.execution_type || 'http_webhook',
+    auth_type: src.auth_type || 'none',
+    credential_id: src.credential_id,
+    input_schema: src.input_schema
+      ? JSON.parse(JSON.stringify({ ...src.input_schema, _displayName: copyLabel }))
+      : { type: 'object', properties: {} },
+    parameter_mapping: src.parameter_mapping
+      ? JSON.parse(JSON.stringify(src.parameter_mapping))
+      : null,
+    response_transform: src.response_transform
+      ? JSON.parse(JSON.stringify(src.response_transform))
+      : null,
+    headers: Object.keys(customHeadersObj).length > 0 ? customHeadersObj : null,
+    status: 'active',
+    version: 1
+  }
+
+  // Also copy custom_headers field used by backend
+  if (Object.keys(customHeadersObj).length > 0) {
+    ;(cloned as any).custom_headers = customHeadersObj
+  }
+
+  functions.value.unshift(cloned)
+  unsavedChanges.value.add(cloned.id!)
+
+  // Manually set up the editor state (bypass selectFunction which resets body params for new_ ids)
+  isSelecting = true
+  selectedFunction.value = cloned
+  displayName.value = copyLabel
+  headers.value = headersCopy
+  bodyParameters.value = bodyParamsCopy
+  syncFieldsToJson()
+  generateTestPayload()
+
+  // Restore fieldTree from copied response_transform
+  const savedTree = (cloned.response_transform as any)?._fieldTree
+  fieldTree.value = Array.isArray(savedTree) ? savedTree : []
+  testResult.value = null
+  isSelecting = false
+
+  showStatus('success', 'Функция дублирована — сохраните для подтверждения')
 }
 
 // Save Function

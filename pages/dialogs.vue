@@ -1,6 +1,9 @@
 <template>
   <!-- Two Column Layout: fills parent completely -->
-  <div class="fixed inset-0 top-[60px] lg:left-16 xl:left-64 flex overflow-hidden bg-muted transition-all duration-300">
+  <div
+    class="fixed inset-0 top-[60px] flex overflow-hidden bg-muted transition-all duration-300"
+    :class="[isCollapsed ? 'lg:left-16' : 'lg:left-64']"
+  >
     <!-- Left Column: Dialogs List (hidden on mobile when chat is open) -->
     <div
       :class="[
@@ -67,7 +70,7 @@ import DialogsEmptyState from '../components/dialogs/DialogsEmptyState.vue'
 import AuthModal from '../components/AuthModal.vue'
 
 // Layout state
-const { pageTitle } = useLayoutState()
+const { pageTitle, isCollapsed } = useLayoutState()
 
 // Auth
 const { isAuthenticated } = useAuth()
